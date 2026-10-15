@@ -3,6 +3,7 @@ attrs==26.1.0
 Django==6.1.2
 djangorestframework==3.18.3
 djangorestframework-simplejwt==5.5.1
+PyJWT==2.15.1
 drf-yasg==1.21.17
 importlib_resources==7.1.0
 inflection==0.5.1
@@ -19,3 +20,5 @@ swagger-spec-validator==3.0.4
 typing_extensions==4.16.0
 tzdata==2026.5
 uritemplate==4.2.0
+python-dotenv==1.2.4
+faker==40.43.0
