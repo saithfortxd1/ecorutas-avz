@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Iniciar sesión · EcoRutas{% endblock %}
+
+{% block content %}
+<div class="auth-wrapper">
+  <div class="auth-card">
+    <h1 class="brand">EcoRutas</h1>
+    <p class="subtitle">Inicia sesión para continuar</p>
+
+    <div id="alert" class="alert hidden"></div>
+
+    <form id="login-form" novalidate>
+      <label for="username">Usuario</label>
+      <input type="text" id="username" name="username" autocomplete="username" required>
+
+      <label for="password">Contraseña</label>
+      <input type="password" id="password" name="password" autocomplete="current-password" required>
+
+      <button type="submit" id="submit-btn">Entrar</button>
+    </form>
+
+    <p class="switch">¿No tienes cuenta? <a href="/registro/">Regístrate aquí</a></p>
+    <p class="switch"><a href="/docs/" target="_blank" rel="noopener">Ver documentación de la API</a></p>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{% static 'js/login.js' %}"></script>
+{% endblock %}
