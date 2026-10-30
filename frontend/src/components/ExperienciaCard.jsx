@@ -28,7 +28,7 @@ export default function ExperienciaCard({ experiencia, canManage, onEdit, onDele
           alt=""
           className="h-full w-full object-cover transition duration-700 group-hover:scale-[1.035] motion-reduce:transform-none motion-reduce:transition-none"
           loading={index < 3 ? 'eager' : 'lazy'}
-          fetchPriority={index === 0 ? 'high' : 'auto'}
+          fetchpriority={index === 0 ? 'high' : 'auto'}
           decoding="async"
           sizes="(max-width: 639px) 100vw, (max-width: 1023px) 50vw, (max-width: 1399px) 33vw, 25vw"
           onError={() => setImage(undefined)}
