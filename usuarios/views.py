@@ -67,7 +67,7 @@ class MenuUsuarioView(generics.GenericAPIView):
                 .distinct()
                 .order_by('nombre')
             )
-            cache.set(cache_key, menu, 300)
+            cache.set(cache_key, menu, 60)
         return Response({'version': request.user.date_joined.timestamp(), 'items': menu})
 
 

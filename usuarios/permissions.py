@@ -3,6 +3,28 @@ from django.core.cache import cache
 from .models import Recurso
 
 
+def _rule_allows_request(rule, path, method):
+    """Compara una regla individual; ignora datos heredados malformados."""
+    if isinstance(rule, str):
+        rule = {'path': rule}
+    if not isinstance(rule, dict):
+        return False
+
+    rule_path = rule.get('path')
+    methods = rule.get('methods', ('get', 'post', 'put', 'patch', 'delete'))
+    if not isinstance(rule_path, str) or not isinstance(methods, (list, tuple, set)):
+        return False
+    if not all(isinstance(allowed_method, str) for allowed_method in methods):
+        return False
+
+    normalized_path = rule_path.rstrip('/')
+    return (
+        method in {allowed_method.lower() for allowed_method in methods}
+        and bool(normalized_path)
+        and (path == normalized_path or path.startswith(normalized_path + '/'))
+    )
+
+
 class HasResourcePermission(permissions.BasePermission):
     """Aplica los permisos declarados en recursos para cada endpoint API."""
     message = 'Tu rol no tiene acceso al recurso solicitado.'
@@ -21,15 +43,17 @@ class HasResourcePermission(permissions.BasePermission):
                 .values_list('permisos', flat=True)
                 .distinct()
             )
-            cache.set(cache_key, permission_lists, 300)
-        for permission_list in permission_lists:
-            for rule in permission_list or []:
-                if isinstance(rule, str):
-                    rule = {'path': rule, 'methods': ['get', 'post', 'put', 'patch', 'delete']}
-                rule_path = rule.get('path', '')
-                methods = [m.lower() for m in rule.get('methods', ['get', 'post', 'put', 'patch', 'delete'])]
-                if method in methods and (path == rule_path or path.startswith(rule_path.rstrip('/') + '/')):
-                    return True
+            cache.set(cache_key, permission_lists, 60)
+        # Las reglas proceden de listas JSON finitas y cada elemento se valida
+        # individualmente; no se resuelven referencias recursivas ni ORM dentro
+        # del recorrido.
+        if any(
+            _rule_allows_request(rule, path, method)
+            for rules in permission_lists
+            if isinstance(rules, list)
+            for rule in rules
+        ):
+            return True
         # Los recursos son opt-in solo para endpoints que declaran esta
         # política. Los endpoints públicos y heredados conservan su política propia.
         return not getattr(view, 'requires_resource_permission', False)

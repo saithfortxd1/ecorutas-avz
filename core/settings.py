@@ -63,10 +63,11 @@ ALLOWED_HOSTS = env_csv('ALLOWED_HOSTS', ('localhost', '127.0.0.1'))
 
 CACHES = {
     'default': {
+        # Caché en proceso para desarrollo local: no requiere Redis ni servicios externos.
         'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
-        'LOCATION': 'ecorutas-rbac-menu',
-        'TIMEOUT': 300,
-        'OPTIONS': {'MAX_ENTRIES': 2000},
+        'LOCATION': 'ecorutas-local-rbac-v1',
+        'TIMEOUT': 60,
+        'OPTIONS': {'MAX_ENTRIES': 1000},
     },
 }
 
