@@ -1,8 +1,6 @@
 import axios from 'axios'
 import { toast } from 'sonner'
 
-const BASE_URL = (import.meta.env.VITE_API_URL || '').replace(/\/+$/, '')
-
 export const ACCESS_KEY = 'ecorutas_access'
 export const REFRESH_KEY = 'ecorutas_refresh'
 
@@ -21,7 +19,7 @@ export const tokenStore = {
 }
 
 const api = axios.create({
-  baseURL: BASE_URL,
+  baseURL: 'http://127.0.0.1:8011/api',
   headers: { 'Content-Type': 'application/json' },
 })
 
@@ -41,7 +39,7 @@ let refreshPromise = null
 async function refreshAccessToken() {
   const refresh = tokenStore.getRefresh()
   if (!refresh) throw new Error('No hay refresh token')
-  const { data } = await axios.post(`${BASE_URL}/login/refresh/`, { refresh })
+  const { data } = await axios.post(`${api.defaults.baseURL}/login/refresh/`, { refresh })
   tokenStore.set(data.access, null)
   return data.access
 }
