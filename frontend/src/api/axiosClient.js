@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { toast } from 'sonner'
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api'
 
@@ -51,6 +52,10 @@ api.interceptors.response.use(
   async (error) => {
     const original = error.config
     const status = error.response?.status
+
+    if (status === 403) {
+      toast.error('No tienes permisos para realizar esta acción.')
+    }
 
     const puedeRefrescar =
       status === 401 &&

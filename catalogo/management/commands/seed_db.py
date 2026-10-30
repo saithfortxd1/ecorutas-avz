@@ -8,6 +8,7 @@ from django.contrib.auth import get_user_model
 from faker import Faker
 
 from catalogo.models import Categoria, Experiencia, FotoExperiencia, Disponibilidad, ExperienciaTraduccion
+from usuarios.models import Recurso, Rol
 
 Usuario = get_user_model()
 
@@ -67,6 +68,8 @@ class Command(BaseCommand):
         n_experiencias = options['experiencias']
         n_disponibilidades = options['disponibilidades']
 
+        self.crear_rbac()
+
         if clean:
             self.stdout.write(self.style.WARNING('Eliminando datos existentes...'))
             Disponibilidad.objects.all().delete()
@@ -92,10 +95,10 @@ class Command(BaseCommand):
                 password='testpass123',
                 first_name='Juan',
                 last_name='Pérez',
-                rol='anfitrion',
                 documento_identidad='12345678A',
                 estado_verificacion='aprobado'
             )
+            anfitrion.roles.add(Rol.objects.get(nombre='Anfitrión'))
             anfitriones = [anfitrion]
 
         self.stdout.write(self.style.NOTICE('Creando experiencias...'))
@@ -118,6 +121,41 @@ class Command(BaseCommand):
             f'\n  - {n_disponibilidades} disponibilidades'
             f'\n  - Fotos y traducciones asociadas'
         ))
+
+    def crear_rbac(self):
+        self.stdout.write(self.style.NOTICE('Configurando roles y recursos RBAC...'))
+        roles = {name: Rol.objects.get_or_create(nombre=name)[0] for name in ('Administrador', 'Anfitrión', 'Turista')}
+        recurso, _ = Recurso.objects.update_or_create(
+            nombre='Catálogo',
+            defaults={
+                'path': '/experiencias',
+                'icono': 'map',
+                'permisos': [
+                    {'path': '/api/catalogo/experiencias/', 'methods': ['get', 'post', 'put', 'patch', 'delete']},
+                    {'path': '/api/catalogo/categorias/', 'methods': ['get', 'post', 'put', 'patch', 'delete']},
+                    {'path': '/api/catalogo/disponibilidades/', 'methods': ['get', 'post', 'put', 'patch', 'delete']},
+                ],
+            },
+        )
+        gestion_usuarios, _ = Recurso.objects.update_or_create(
+            nombre='Gestión de Usuarios',
+            defaults={'path': '/admin/usuarios', 'icono': 'users', 'permisos': [{'path': '/api/usuarios/admin/', 'methods': ['get', 'post', 'put', 'patch', 'delete']}]},
+        )
+        gestion_roles, _ = Recurso.objects.update_or_create(
+            nombre='Gestión de Roles',
+            defaults={'path': '/admin/roles', 'icono': 'shield', 'permisos': [{'path': '/api/usuarios/roles/', 'methods': ['get', 'post', 'put', 'patch', 'delete']}]},
+        )
+        gestion_recursos, _ = Recurso.objects.update_or_create(
+            nombre='Gestión de Recursos',
+            defaults={'path': '/admin/recursos', 'icono': 'grid', 'permisos': [{'path': '/api/usuarios/recursos/', 'methods': ['get', 'post', 'put', 'patch', 'delete']}]},
+        )
+        roles['Administrador'].recursos.add(recurso, gestion_usuarios, gestion_roles, gestion_recursos)
+        roles['Anfitrión'].recursos.add(recurso)
+        roles['Turista'].recursos.add(recurso)
+        # Asigna el rol dinámico equivalente a los usuarios preexistentes y nuevos.
+        for user in Usuario.objects.all().iterator():
+            role_name = 'Administrador' if user.is_staff or user.rol == 'administrador' else ('Anfitrión' if user.rol == 'anfitrion' else 'Turista')
+            user.roles.add(roles[role_name])
 
     def crear_categorias(self, n):
         nombres_categorias = [
@@ -147,8 +185,9 @@ class Command(BaseCommand):
                 password='testpass123',
                 first_name=first_name,
                 last_name=last_name,
-                rol=rol,
             )
+            role_name = 'Anfitrión' if rol == 'anfitrion' else 'Turista'
+            user.roles.add(Rol.objects.get(nombre=role_name))
 
             if rol == 'anfitrion':
                 user.documento_identidad = fake.unique.bothify(text='??########')

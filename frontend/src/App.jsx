@@ -8,6 +8,7 @@ const LandingPage = lazy(() => import('./pages/LandingPage.jsx'))
 const LoginPage = lazy(() => import('./pages/LoginPage.jsx'))
 const RegistroPage = lazy(() => import('./pages/RegistroPage.jsx'))
 const ExperienciasPage = lazy(() => import('./pages/ExperienciasPage.jsx'))
+const AdminPage = lazy(() => import('./pages/AdminPage.jsx'))
 
 export default function App() {
   return (
@@ -24,6 +25,9 @@ export default function App() {
             </ProtectedRoute>
           }
         />
+        <Route path="/admin/usuarios" element={<ProtectedRoute><AdminPage /></ProtectedRoute>} />
+        <Route path="/admin/roles" element={<ProtectedRoute><AdminPage /></ProtectedRoute>} />
+        <Route path="/admin/recursos" element={<ProtectedRoute><AdminPage /></ProtectedRoute>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Suspense>

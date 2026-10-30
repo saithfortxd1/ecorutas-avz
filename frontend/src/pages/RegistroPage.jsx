@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
+import { ArrowLeft, Leaf } from 'lucide-react'
 import { useAuth } from '../context/AuthContext.jsx'
 import { extractErrorMessage } from '../utils/errors.js'
 
@@ -80,13 +81,15 @@ export default function RegistroPage() {
   }
 
   const inputClass =
-    'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-eco-500 focus:outline-none focus:ring-2 focus:ring-eco-200'
+    'min-h-11 w-full rounded-xl border border-stone-300 bg-[#fbfaf6] px-3 py-2.5 text-sm focus:border-eco-600 focus:outline-none focus:ring-2 focus:ring-eco-100'
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-eco-50 to-slate-50 p-4">
-      <div className="w-full max-w-lg rounded-2xl bg-white p-8 shadow-xl">
-        <h1 className="text-2xl font-extrabold text-eco-700">Crear cuenta</h1>
-        <p className="mt-1 text-sm text-slate-500">Únete a EcoRutas como turista o anfitrión</p>
+    <div className="relative flex min-h-screen items-center justify-center bg-[#f7f5ee] p-4 pt-20 sm:p-8 sm:pt-20">
+      <Link to="/" className="absolute left-4 top-5 inline-flex min-h-11 items-center gap-2 rounded-full px-4 text-sm font-semibold text-eco-900 transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-eco-600 sm:left-8 sm:top-8"><ArrowLeft size={17} aria-hidden="true" />Volver al inicio</Link>
+      <div className="w-full max-w-lg rounded-[1.75rem] border border-white bg-white/90 p-6 shadow-[0_26px_70px_-42px_rgba(20,60,43,.45)] backdrop-blur-sm sm:p-9">
+        <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-eco-800 text-white"><Leaf size={21} aria-hidden="true" /></span>
+        <h1 className="mt-4 font-display text-3xl text-eco-950">Empieza tu próxima ruta</h1>
+        <p className="mt-2 text-sm text-stone-600">Crea tu cuenta como turista o anfitrión local.</p>
 
         {error && (
           <p className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>

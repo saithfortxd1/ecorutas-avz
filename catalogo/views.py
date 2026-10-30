@@ -1,14 +1,15 @@
 from rest_framework import viewsets
 from rest_framework.filters import SearchFilter, OrderingFilter
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import PermissionDenied
+from django.db.models import Prefetch
 
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 
-from usuarios.permissions import IsAnfitrion, IsOwnerOrReadOnly, IsAdminOrReadOnly
+from usuarios.permissions import HasResourcePermission, IsAnfitrion, IsOwnerOrReadOnly, IsAdminOrReadOnly
 
-from .models import Categoria, Experiencia, Disponibilidad
+from .models import Categoria, Experiencia, Disponibilidad, ExperienciaTraduccion, FotoExperiencia
 from .serializers import (
     CategoriaSerializer,
     ExperienciaSerializer,
@@ -24,7 +25,8 @@ class CategoriaViewSet(viewsets.ModelViewSet):
     """
     queryset = Categoria.objects.all()
     serializer_class = CategoriaSerializer
-    permission_classes = [IsAdminOrReadOnly]
+    permission_classes = [IsAdminOrReadOnly, IsAuthenticated, HasResourcePermission]
+    requires_resource_permission = True
 
     @swagger_auto_schema(
         operation_summary='Listar categorías',
@@ -54,19 +56,31 @@ class ExperienciaViewSet(viewsets.ModelViewSet):
     """
     queryset = Experiencia.objects.select_related(
         'anfitrion', 'categoria'
-    ).prefetch_related('traducciones', 'fotos')
+    ).prefetch_related(
+        Prefetch(
+            'traducciones',
+            queryset=ExperienciaTraduccion.objects.only(
+                'id', 'experiencia_id', 'idioma', 'titulo_traducido', 'descripcion_traducida',
+            ),
+        ),
+        Prefetch(
+            'fotos',
+            queryset=FotoExperiencia.objects.only('id', 'experiencia_id', 'url_foto', 'es_principal'),
+        ),
+    )
     serializer_class = ExperienciaSerializer
     filter_backends = [SearchFilter, OrderingFilter]
     search_fields = ['titulo', 'descripcion', 'categoria__nombre']
     ordering_fields = ['precio_unitario', 'created_at']
 
     def get_permissions(self):
+        self.requires_resource_permission = True
         if self.action in ('list', 'retrieve'):
-            permission_classes = [AllowAny]
+            permission_classes = [IsAuthenticated, HasResourcePermission]
         elif self.action == 'create':
-            permission_classes = [IsAuthenticated, IsAnfitrion]
+            permission_classes = [IsAuthenticated, IsAnfitrion, HasResourcePermission]
         else:  # update, partial_update, destroy
-            permission_classes = [IsAuthenticated, IsAnfitrion, IsOwnerOrReadOnly]
+            permission_classes = [IsAuthenticated, IsAnfitrion, IsOwnerOrReadOnly, HasResourcePermission]
         return [permission() for permission in permission_classes]
 
     def perform_create(self, serializer):
@@ -133,17 +147,19 @@ class DisponibilidadViewSet(viewsets.ModelViewSet):
     serializer_class = DisponibilidadSerializer
 
     def get_permissions(self):
+        self.requires_resource_permission = True
         if self.action in ('list', 'retrieve'):
-            permission_classes = [AllowAny]
+            permission_classes = [IsAuthenticated, HasResourcePermission]
         elif self.action == 'create':
-            permission_classes = [IsAuthenticated, IsAnfitrion]
+            permission_classes = [IsAuthenticated, IsAnfitrion, HasResourcePermission]
         else:  # update, partial_update, destroy
-            permission_classes = [IsAuthenticated, IsAnfitrion, IsOwnerOrReadOnly]
+            permission_classes = [IsAuthenticated, IsAnfitrion, IsOwnerOrReadOnly, HasResourcePermission]
         return [permission() for permission in permission_classes]
 
     def perform_create(self, serializer):
         experiencia = serializer.validated_data.get('experiencia')
-        if experiencia is not None and experiencia.anfitrion_id != self.request.user.id:
+        es_admin = self.request.user.roles.filter(nombre='Administrador').exists()
+        if experiencia is not None and experiencia.anfitrion_id != self.request.user.id and not es_admin:
             raise PermissionDenied(
                 'Solo puedes crear disponibilidades para tus propias experiencias.'
             )
@@ -153,7 +169,8 @@ class DisponibilidadViewSet(viewsets.ModelViewSet):
         # Evita que un anfitrión reasigne la disponibilidad a la experiencia
         # de otro anfitrión (bypass del control de propiedad).
         experiencia = serializer.validated_data.get('experiencia')
-        if experiencia is not None and experiencia.anfitrion_id != self.request.user.id:
+        es_admin = self.request.user.roles.filter(nombre='Administrador').exists()
+        if experiencia is not None and experiencia.anfitrion_id != self.request.user.id and not es_admin:
             raise PermissionDenied(
                 'Solo puedes asociar disponibilidades a tus propias experiencias.'
             )

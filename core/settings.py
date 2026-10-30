@@ -42,7 +42,15 @@ if not SECRET_KEY:
             'Copie .env.example a .env y configure un valor seguro.'
         )
 
-ALLOWED_HOSTS = [host.strip() for host in os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')]
+def env_csv(name, default):
+    """Lee una lista separada por comas desde entorno o archivo .env."""
+    value = os.environ.get(name)
+    if value is None:
+        return list(default)
+    return [item.strip() for item in value.split(',') if item.strip()]
+
+
+ALLOWED_HOSTS = env_csv('ALLOWED_HOSTS', ('localhost', '127.0.0.1'))
 
 
 # Application definition
@@ -91,10 +99,11 @@ SWAGGER_SETTINGS = {
 }
 
 # CORS: permite que la SPA (Vite) consuma la API desde otro origen.
-CORS_ALLOWED_ORIGINS = [
-    'http://localhost:5173',
-    'http://127.0.0.1:5173',
-]
+CORS_ALLOWED_ORIGINS = env_csv(
+    'CORS_ALLOWED_ORIGINS',
+    ('http://localhost:5173', 'http://127.0.0.1:5173'),
+)
+CORS_ALLOWED_ORIGINS = [origin.rstrip('/') for origin in CORS_ALLOWED_ORIGINS]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',

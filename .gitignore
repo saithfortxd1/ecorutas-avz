@@ -3,6 +3,13 @@ venv/
 env/
 .venv/
 
+# Frontend (npm / Vite)
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+.vite/
+
 # Python
 __pycache__/
 *.py[cod]

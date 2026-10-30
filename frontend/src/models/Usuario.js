@@ -9,6 +9,7 @@ export function normalizeUsuario(raw) {
     lastName: raw.last_name ?? '',
     rol: raw.rol,
     rolDisplay: raw.rol_display ?? raw.rol,
+    roles: Array.isArray(raw.roles) ? raw.roles : [],
     documentoIdentidad: raw.documento_identidad ?? null,
     estadoVerificacion: raw.estado_verificacion ?? null,
     perfilAnfitrion: raw.perfil_anfitrion ?? null,
@@ -25,4 +26,8 @@ export function fullName(usuario) {
 
 export function isAnfitrion(usuario) {
   return usuario?.rol === 'anfitrion'
+}
+
+export function isAdministrador(usuario) {
+  return Boolean(usuario?.roles?.includes('Administrador') || usuario?.rol === 'administrador')
 }

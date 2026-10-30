@@ -15,7 +15,11 @@ export default {
           700: '#1b5e20',
           800: '#154a1a',
           900: '#0f3513',
+          950: '#0d2b20',
         },
+      },
+      fontFamily: {
+        display: ['Georgia', 'Times New Roman', 'serif'],
       },
     },
   },
