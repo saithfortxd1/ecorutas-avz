@@ -41,6 +41,14 @@
       .replace(/'/g, '&#39;');
   }
 
+  function formatCOP(value) {
+    var amount = Number(value);
+    if (!Number.isFinite(amount)) return 'Precio por confirmar';
+    return new Intl.NumberFormat('es-CO', {
+      style: 'currency', currency: 'COP', maximumFractionDigits: 0
+    }).format(amount) + ' COP';
+  }
+
   function showAlert(message, type) {
     alertBox.textContent = message;
     alertBox.className = 'alert ' + (type || 'error');
@@ -69,11 +77,12 @@
       : '@' + user.username;
 
     var esAnfitrion = api.Auth.isAnfitrion();
-    rolBadge.textContent = esAnfitrion ? 'Anfitrión' : 'Turista';
-    rolBadge.className = 'badge ' + (esAnfitrion ? 'anfitrion' : 'turista');
+    var esAdministrador = api.Auth.isAdministrador();
+    rolBadge.textContent = esAdministrador ? 'Administrador' : (esAnfitrion ? 'Anfitrión' : 'Turista');
+    rolBadge.className = 'badge ' + (esAdministrador ? 'administrador' : (esAnfitrion ? 'anfitrion' : 'turista'));
 
     // Mostrar/ocultar el botón de crear según el rol
-    if (esAnfitrion) {
+    if (esAnfitrion || esAdministrador) {
       createBtn.classList.remove('hidden');
     } else {
       createBtn.classList.add('hidden');
@@ -98,11 +107,19 @@
     emptyState.classList.add('hidden');
 
     var esAnfitrion = api.Auth.isAnfitrion();
+    var esAdministrador = api.Auth.isAdministrador();
     var userId = state.user.id;
 
     grid.innerHTML = state.experiencias.map(function (exp) {
-      var esPropietario = esAnfitrion && exp.anfitrion === userId;
+      var esPropietario = esAdministrador || (esAnfitrion && exp.anfitrion === userId);
       var categoria = exp.categoria_nombre ? esc(exp.categoria_nombre) : 'Sin categoría';
+      var primaryPhoto = Array.isArray(exp.fotos) && exp.fotos.find(function (photo) { return photo.es_principal && photo.url_foto; });
+      var anyPhoto = Array.isArray(exp.fotos) && exp.fotos.find(function (photo) { return photo.url_foto; });
+      var photo = primaryPhoto || anyPhoto;
+      var imageUrl = photo && /^https?:\/\//i.test(photo.url_foto) ? photo.url_foto : '';
+      var imageMarkup = imageUrl
+        ? '<img class="card-image" src="' + esc(imageUrl) + '" alt="Paisaje de ' + esc(exp.titulo) + '" width="800" height="540" loading="lazy" decoding="async">'
+        : '<div class="card-image card-image-placeholder" role="img" aria-label="Imagen no disponible">EcoRutas · Colombia</div>';
 
       var acciones = '';
       if (esPropietario) {
@@ -113,11 +130,12 @@
 
       return '' +
         '<article class="card">' +
+          '<div class="card-media">' + imageMarkup + '</div>' +
           '<span class="cat">' + categoria + '</span>' +
           '<h3>' + esc(exp.titulo) + '</h3>' +
           '<p>' + esc(exp.descripcion) + '</p>' +
           '<div class="meta">Ubicación: ' + esc(exp.latitud) + ', ' + esc(exp.longitud) + '</div>' +
-          '<div class="price">' + esc(exp.precio_unitario) + ' &euro; / persona</div>' +
+          '<div class="price"><span class="price-label">Precio publicado</span><strong>' + esc(formatCOP(exp.precio_unitario)) + '</strong><span class="price-unit">/ persona</span></div>' +
           '<div class="meta">Estado: ' + esc(exp.estado) + '</div>' +
           '<div class="meta owner-tag">Anfitrión: @' + esc(exp.anfitrion_username || exp.anfitrion) + '</div>' +
           (acciones ? '<div class="actions">' + acciones + '</div>' : '') +
@@ -219,8 +237,8 @@
     hideModalAlert();
 
     // Doble verificación de RBAC en el cliente
-    if (!api.Auth.isAnfitrion()) {
-      showModalAlert('Solo los anfitriones pueden crear o editar experiencias.');
+    if (!api.Auth.isAnfitrion() && !api.Auth.isAdministrador()) {
+      showModalAlert('Tu rol no permite crear o editar experiencias.');
       return;
     }
 
@@ -279,7 +297,7 @@
     .then(function (user) {
       state.user = user;
       renderHeader();
-      if (!api.Auth.isAnfitrion()) {
+      if (!api.Auth.isAnfitrion() && !api.Auth.isAdministrador()) {
         // Los turistas no necesitan el formulario de categorías.
         return loadExperiencias();
       }

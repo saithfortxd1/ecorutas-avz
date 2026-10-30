@@ -44,6 +44,12 @@
     },
     isAnfitrion: function () {
       return this.rol() === 'anfitrion';
+    },
+    isAdministrador: function () {
+      var user = this.getUser();
+      if (!user) return false;
+      return user.rol === 'administrador' || user.is_staff === true || user.is_superuser === true ||
+        (Array.isArray(user.roles) && user.roles.indexOf('Administrador') !== -1);
     }
   };
 

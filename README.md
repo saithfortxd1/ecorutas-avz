@@ -129,6 +129,8 @@ python manage.py runserver
 
 La API local queda en `http://127.0.0.1:8000/api/`. Swagger está disponible en `http://127.0.0.1:8000/docs/`. Configura `ALLOWED_HOSTS` y `CORS_ALLOWED_ORIGINS` en `.env` para los dominios de tu entorno; Vite suele ejecutarse en `http://localhost:5173`.
 
+Con `DEBUG=True`, el proyecto usa MD5 de Django para agilizar el desarrollo y conserva PBKDF2 como verificador de hashes existentes. Con `DEBUG=False` no activa ese hasher rápido y se mantienen los hashers seguros predeterminados de Django.
+
 ### Ejecutar React + Vite
 
 En otra terminal, desde la carpeta `frontend/` dentro de la raíz del repositorio:
@@ -168,9 +170,9 @@ Desde la raíz de Django, ejecuta:
 python manage.py seed_db --reemplazar-experiencias
 ```
 
-El comando carga hasta siete experiencias de destinos colombianos: Cabo de la Vela, Ciudad Perdida, Tayrona, Valle del Cocora, Bahía Solano, Caño Cristales y el Santuario Los Flamencos. Los precios se guardan como valores decimales en pesos colombianos y la interfaz los presenta con formato `es-CO`.
+El comando carga 100 variantes de demostración permutando actividades en destinos colombianos de La Guajira, la Sierra Nevada, Tayrona, el Eje Cafetero, el Pacífico, la Amazonía y otras regiones. Los precios se guardan como valores decimales enteros en COP y las interfaces los presentan con formato colombiano. Estos registros de seeding no certifican por sí solos disponibilidad ni ofertas de operadores turísticos.
 
-`--reemplazar-experiencias` elimina las experiencias existentes y sus fotos, traducciones y disponibilidades relacionadas antes de insertar el catálogo de demostración. No elimina usuarios, roles ni categorías; puede crear categorías base que aún no existan. Por defecto no genera lotes de usuarios de prueba ni disponibilidades. Si no hay ningún usuario con rol Anfitrión, crea la cuenta local de respaldo `anfitrion_test` con contraseña `testpass123`, que debe cambiarse o eliminarse de inmediato. El comando está protegido cuando `DEBUG=False`; no lo ejecutes contra datos de producción. La opción `--clean` tiene un alcance más amplio y además elimina categorías y usuarios que no sean superusuarios.
+`--reemplazar-experiencias` elimina las experiencias existentes y sus fotos, traducciones y disponibilidades relacionadas antes de insertar las 100 variantes. No elimina usuarios, roles ni categorías; puede crear categorías base que aún no existan. Por defecto no genera lotes de usuarios de prueba ni disponibilidades. Si no hay ningún usuario con rol Anfitrión, crea la cuenta local de respaldo `anfitrion_test` con contraseña `testpass123`, que debe cambiarse o eliminarse de inmediato. El comando está protegido cuando `DEBUG=False`; no lo ejecutes contra datos de producción. La opción `--clean` tiene un alcance más amplio y además elimina categorías y usuarios que no sean superusuarios.
 
 ## Endpoints principales
 

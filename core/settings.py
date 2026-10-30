@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/6.1/ref/settings/
 
 from pathlib import Path
 import os
+from django.conf import global_settings
 from dotenv import load_dotenv
 from django.core.exceptions import ImproperlyConfigured
 
@@ -28,6 +29,14 @@ load_dotenv(BASE_DIR / '.env')
 # SECURITY WARNING: don't run with debug turned on in production!
 # Por defecto seguro: solo se activa si la variable de entorno lo indica.
 DEBUG = os.environ.get('DEBUG', 'False').lower() in ('true', '1', 'yes')
+
+# Hash rápido exclusivamente en desarrollo; conserva todos los hashers de
+# Django para poder verificar cuentas existentes.
+if DEBUG:
+    PASSWORD_HASHERS = [
+        'django.contrib.auth.hashers.MD5PasswordHasher',
+        *global_settings.PASSWORD_HASHERS,
+    ]
 
 # SECURITY WARNING: keep the secret key used in production secret!
 # En desarrollo (DEBUG=True) se permite una clave por defecto; fuera de
@@ -51,6 +60,15 @@ def env_csv(name, default):
 
 
 ALLOWED_HOSTS = env_csv('ALLOWED_HOSTS', ('localhost', '127.0.0.1'))
+
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'ecorutas-rbac-menu',
+        'TIMEOUT': 300,
+        'OPTIONS': {'MAX_ENTRIES': 2000},
+    },
+}
 
 
 # Application definition

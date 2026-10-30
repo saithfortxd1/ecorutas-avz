@@ -1,4 +1,5 @@
 from rest_framework import permissions
+from django.core.cache import cache
 from .models import Recurso
 
 
@@ -12,7 +13,15 @@ class HasResourcePermission(permissions.BasePermission):
             return False
         path = request.path
         method = request.method.lower()
-        permission_lists = Recurso.objects.filter(roles__usuarios=user).values_list('permisos', flat=True).distinct()
+        cache_key = f'usuario-permisos:{user.pk}'
+        permission_lists = cache.get(cache_key)
+        if permission_lists is None:
+            permission_lists = list(
+                Recurso.objects.filter(roles__usuarios__pk=user.pk)
+                .values_list('permisos', flat=True)
+                .distinct()
+            )
+            cache.set(cache_key, permission_lists, 300)
         for permission_list in permission_lists:
             for rule in permission_list or []:
                 if isinstance(rule, str):
