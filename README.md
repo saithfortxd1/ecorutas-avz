@@ -1,30 +1,94 @@
 # EcoRutas
 
-Plataforma de turismo de naturaleza con arquitectura desacoplada: **Django REST Framework** expone la API y **React + Vite** ofrece la SPA. El backend valida autenticación y permisos; el frontend consume los contratos REST con Axios y JWT.
+Plataforma de turismo de naturaleza con una API en **Django REST Framework** y una aplicación SPA en **React + Vite**. La API administra cuentas, catálogo y permisos; React consume sus endpoints con Axios y autenticación JWT.
 
-## Arquitectura
+## Estructura del proyecto
 
-```mermaid
-flowchart LR
-  Browser[React + Vite SPA] -->|JWT / JSON| API[Django REST Framework]
-  API --> Auth[JWT Authentication]
-  API --> DB[(SQLite dev / PostgreSQL)]
-  User[usuario] -->|M:N usuario_has_rol| Role[rol]
-  Role -->|M:N rol_has_recurso| Resource[recurso]
-  Resource -->|ruta UI + reglas API| API
+En el espacio de trabajo local, los proyectos aparecen como dos carpetas hermanas:
+
+```text
+workspace/
+├── ecorutas-backend/             # Checkout local y raíz Git: Django y el frontend rastreado
+│   ├── catalogo/                 # Experiencias, categorías, fotos y disponibilidades
+│   ├── core/                     # Configuración Django, CORS y rutas globales
+│   ├── usuarios/                 # Usuarios, autenticación y RBAC relacional
+│   ├── frontend/                 # React + Vite dentro de este repositorio
+│   ├── manage.py
+│   ├── requirements.txt
+│   └── README.md
+└── ecorutas-frontend/            # Copia hermana de React + Vite de este espacio de trabajo
+    ├── src/
+    ├── package.json
+    └── vite.config.js
 ```
 
-El menú de `GET /api/usuarios/menu/` se construye con los recursos enlazados a los roles relacionales del usuario. `HasResourcePermission` comprueba las reglas por ruta y método en cada endpoint protegido; las protecciones de rutas React son solo una ayuda de navegación y no sustituyen la autorización del servidor.
+El repositorio GitHub `ecorutas-avz` contiene el backend en su raíz y el frontend rastreado en `frontend/`. La carpeta hermana `ecorutas-frontend/` es una copia local de trabajo y no es un submódulo ni una carpeta versionada por este repositorio. Para clonar y trabajar únicamente con GitHub, usa `frontend/`.
 
-Las tablas `usuario`, `rol` y `recurso` usan claves primarias. `usuario_has_rol` y `rol_has_recurso` tienen claves foráneas indexadas por Django y restricciones únicas compuestas para impedir asignaciones duplicadas.
+## Tecnologías
 
-## Requisitos
+- Python 3.12+ y Django REST Framework.
+- SimpleJWT para autenticación y renovación de tokens.
+- React 18, Vite, React Router y Axios.
+- SQLite para desarrollo local; PostgreSQL puede configurarse para otros entornos.
+
+## Modelo RBAC relacional
+
+Los roles y recursos se vinculan mediante relaciones muchos-a-muchos. Las tablas intermedias mantienen las asignaciones normalizadas:
+
+```mermaid
+erDiagram
+    usuario ||--o{ usuario_has_rol : asigna
+    rol ||--o{ usuario_has_rol : recibe
+    rol ||--o{ rol_has_recurso : autoriza
+    recurso ||--o{ rol_has_recurso : pertenece
+    usuario {
+        bigint Usua_ID PK
+        string Usua_nombre
+        string Usua_email
+    }
+    rol {
+        bigint Rol_ID PK
+        string Rol_nombre
+    }
+    recurso {
+        bigint idrecurso PK
+        string nombre
+        string path
+        string icono
+        json permisos
+    }
+    usuario_has_rol {
+        bigint usuario_id FK
+        bigint rol_id FK
+    }
+    rol_has_recurso {
+        bigint rol_id FK
+        bigint recurso_id FK
+    }
+```
+
+`usuario_has_rol` conecta usuarios con roles y `rol_has_recurso` conecta roles con recursos. Las restricciones únicas evitan duplicar una misma pareja de asignación. Cada recurso describe su ruta de interfaz y las rutas/métodos de API autorizados.
+
+### Menú dinámico y autorización
+
+`GET /api/usuarios/menu/` requiere un JWT válido. Devuelve los recursos asociados a los roles del usuario, por ejemplo:
+
+```json
+{
+  "version": 1730000000.0,
+  "items": [
+    { "id": 1, "nombre": "Catálogo", "path": "/experiencias", "icono": "map" }
+  ]
+}
+```
+
+La SPA usa `items` para mostrar enlaces y proteger rutas directas. En el backend, `HasResourcePermission` comprueba también la ruta y el método del endpoint contra los permisos del recurso; ocultar una opción en React no sustituye la autorización del servidor.
+
+## Requisitos e instalación
 
 - Python 3.12 o superior y `pip`.
 - Node.js 18 o superior y `npm`.
-- SQLite para desarrollo local (incluido con Python); PostgreSQL es opcional.
-
-## Ejecutar en desarrollo
+- Git.
 
 Clona el repositorio y entra a su raíz:
 
@@ -33,7 +97,9 @@ git clone https://github.com/saithfortxd1/ecorutas-avz.git
 cd ecorutas-avz
 ```
 
-### Backend
+### Configurar y ejecutar el backend
+
+Desde la raíz del repositorio (la carpeta que contiene `manage.py`):
 
 ```bash
 python -m venv venv
@@ -42,99 +108,106 @@ python -m venv venv
 pip install -r requirements.txt
 ```
 
-Crea la configuración local desde el ejemplo y configura una `SECRET_KEY` propia:
+Copia `.env.example` como `.env` y configura una clave secreta para tu entorno. En PowerShell:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+En macOS/Linux:
 
 ```bash
 cp .env.example .env
 ```
 
-En Windows PowerShell se puede copiar con `Copy-Item .env.example .env`. Conserva `DEBUG=True` solo en desarrollo. Después:
+Aplica las migraciones y levanta Django:
 
 ```bash
 python manage.py migrate
 python manage.py runserver
 ```
 
-La API queda en `http://127.0.0.1:8000/`. `CORS_ALLOWED_ORIGINS` y `ALLOWED_HOSTS` se configuran desde `.env`; el ejemplo permite Vite en `http://localhost:5173` y `http://127.0.0.1:5173`.
+La API local queda en `http://127.0.0.1:8000/api/`. Swagger está disponible en `http://127.0.0.1:8000/docs/`. Configura `ALLOWED_HOSTS` y `CORS_ALLOWED_ORIGINS` en `.env` para los dominios de tu entorno; Vite suele ejecutarse en `http://localhost:5173`.
 
-### Frontend
+### Ejecutar React + Vite
 
-En otra terminal, desde el directorio `frontend/`:
+En otra terminal, desde la carpeta `frontend/` dentro de la raíz del repositorio:
 
 ```bash
 npm ci
-cp .env.example .env
+# Copia .env.example como .env si necesitas cambiar VITE_API_BASE_URL
 npm run dev
 ```
 
-En Windows PowerShell, usa `Copy-Item .env.example .env`. La SPA abre en `http://localhost:5173`; `VITE_API_BASE_URL` por defecto apunta a `http://127.0.0.1:8000/api`.
+Abre `http://localhost:5173/`. La URL de API por defecto es `http://127.0.0.1:8000/api`.
 
-Comprobación del build de producción:
+En el espacio de trabajo local también existe la carpeta hermana `ecorutas-frontend/`; si trabajas directamente desde esa copia, ejecuta los mismos comandos dentro de ella. Mantén sus archivos sincronizados con `frontend/` si quieres incluir los cambios en este repositorio.
+
+Para compilar y previsualizar una versión de producción:
 
 ```bash
 npm run build
 npm run preview
 ```
 
-### Base de datos de demostración
+### Crear un administrador local
 
-Para poblar roles, recursos y datos de ejemplo en desarrollo:
+Después de migrar, crea una cuenta administrativa con una contraseña propia:
 
 ```bash
-python manage.py seed_db
+python manage.py createsuperuser
 ```
 
-`seed_db --clean` borra los datos de catálogo y usuarios no superusuarios antes de crear datos nuevos. Está deshabilitado cuando `DEBUG=False`, salvo que se fuerce explícitamente; no ejecutes opciones destructivas en una base de producción.
+El seeder asigna a los superusuarios el rol relacional Administrador y sus recursos base. No reutilices contraseñas de demostración en producción.
 
-Para crear la cuenta administrativa local de demostración, aplica primero las migraciones y luego crea el superusuario. Ejemplo en PowerShell:
+## Cargar experiencias colombianas con precios COP
 
-```powershell
-$env:DJANGO_SUPERUSER_PASSWORD = 'admin1234'
-python manage.py createsuperuser --noinput --username admin --email admin@ecorutas.com
-Remove-Item Env:DJANGO_SUPERUSER_PASSWORD
-python manage.py seed_db
+Desde la raíz de Django, ejecuta:
+
+```bash
+python manage.py seed_db --reemplazar-experiencias
 ```
 
-En macOS/Linux puedes establecer `DJANGO_SUPERUSER_PASSWORD=admin1234` antes de `createsuperuser`. El seeder asigna el rol relacional Administrador a superusuarios y prepara los recursos base.
+El comando carga hasta siete experiencias de destinos colombianos: Cabo de la Vela, Ciudad Perdida, Tayrona, Valle del Cocora, Bahía Solano, Caño Cristales y el Santuario Los Flamencos. Los precios se guardan como valores decimales en pesos colombianos y la interfaz los presenta con formato `es-CO`.
 
-**Credencial de demostración local:** `admin` / `admin1234`. Es una contraseña pública de desarrollo: cámbiala inmediatamente y no la uses ni la despliegues en producción.
+`--reemplazar-experiencias` elimina las experiencias existentes y sus fotos, traducciones y disponibilidades relacionadas antes de insertar el catálogo de demostración. No elimina usuarios, roles ni categorías; puede crear categorías base que aún no existan. Por defecto no genera lotes de usuarios de prueba ni disponibilidades. Si no hay ningún usuario con rol Anfitrión, crea la cuenta local de respaldo `anfitrion_test` con contraseña `testpass123`, que debe cambiarse o eliminarse de inmediato. El comando está protegido cuando `DEBUG=False`; no lo ejecutes contra datos de producción. La opción `--clean` tiene un alcance más amplio y además elimina categorías y usuarios que no sean superusuarios.
 
-## API principal
+## Endpoints principales
 
-Todas las rutas siguientes cuelgan de `/api/`.
+Todas las rutas de la tabla están bajo `/api`:
 
-| Método y ruta | Uso |
+| Método y ruta | Función |
 |---|---|
-| `POST /login/` | Obtener access y refresh JWT |
-| `POST /login/refresh/` | Renovar el access token |
+| `POST /login/` | Obtener tokens JWT de acceso y renovación |
+| `POST /login/refresh/` | Renovar el token de acceso |
 | `POST /usuarios/registro/` | Registrar turista o anfitrión |
 | `GET /usuarios/me/` | Consultar el perfil autenticado |
-| `GET /usuarios/menu/` | Consultar el menú autorizado según roles y recursos |
-| `GET, POST /usuarios/admin/` | Listar o crear usuarios (administración) |
-| `GET, PUT, PATCH, DELETE /usuarios/admin/{id}/` | Consultar o modificar un usuario |
-| `GET, POST /usuarios/roles/` | Listar o crear roles |
-| `GET, PUT, PATCH, DELETE /usuarios/roles/{id}/` | Consultar o modificar un rol y sus recursos |
-| `GET, POST /usuarios/recursos/` | Listar o crear recursos |
-| `GET, PUT, PATCH, DELETE /usuarios/recursos/{id}/` | Consultar o modificar un recurso y sus permisos |
-| `GET, POST /catalogo/categorias/` | Consultar categorías; escritura solo con rol/permiso autorizado |
-| `GET, POST /catalogo/experiencias/` | Consultar o crear experiencias; soporta `?search=` y `?ordering=` |
-| `GET, POST /catalogo/disponibilidades/` | Consultar o gestionar disponibilidad autorizada |
+| `GET /usuarios/menu/` | Obtener los recursos del menú autorizados por RBAC |
+| `GET, POST /usuarios/admin/` | Listar y crear usuarios (administración) |
+| `/usuarios/admin/{id}/` | Consultar, actualizar o eliminar un usuario |
+| `GET, POST /usuarios/roles/` | Listar y crear roles |
+| `/usuarios/roles/{id}/` | Consultar, actualizar o eliminar roles y sus recursos |
+| `GET, POST /usuarios/recursos/` | Listar y crear recursos |
+| `/usuarios/recursos/{id}/` | Consultar, actualizar o eliminar recursos y permisos |
+| `/catalogo/categorias/` | Consultar y administrar categorías según permisos |
+| `/catalogo/experiencias/` | Consultar y administrar experiencias; admite `?search=` y `?ordering=` |
+| `/catalogo/disponibilidades/` | Consultar y administrar disponibilidades según permisos |
 
-Los endpoints administrativos requieren sesión JWT y permisos de recurso asignados. La API documentada también está disponible en `/docs/` (Swagger) y `/redoc/`.
+Los endpoints administrativos requieren JWT y el permiso asociado al recurso. Las operaciones de escritura también aplican sus reglas de rol y propiedad.
 
-## Tecnologías y carpetas
+## Comprobaciones locales
 
-- `usuarios/`: usuario Django y modelo RBAC M:N, serializadores, permisos y endpoints administrativos.
-- `catalogo/`: categorías, experiencias, imágenes y disponibilidades.
-- `core/`: settings, rutas, CORS, autenticación JWT y documentación API.
-- `frontend/`: SPA React/Vite, rutas lazy, estado de sesión, servicios Axios y vistas.
+```bash
+python manage.py check
+python manage.py test
+```
 
-## Rendimiento
+Desde `frontend/`:
 
-Los perfiles y listas administrativas precargan sus relaciones M:N; el menú se resuelve con una consulta de recursos y se cachea en el backend. El cliente restaura un snapshot de sesión asociado al ID del JWT y revalida perfil y menú en paralelo; las listas administrativas usan un TTL de 15 segundos y se invalidan después de sus mutaciones. La precarga de pantalla ocurre al enfocar o pasar el puntero por los enlaces disponibles.
-
-Estos mecanismos reducen trabajo repetido, pero no garantizan latencias universales inferiores a 10 ms: red, base de datos, dispositivo y carga determinan los tiempos medidos.
+```bash
+npm run build
+```
 
 ## Configuración sensible
 
-No incluyas `.env`, credenciales, `venv/`, `node_modules/` ni `dist/` en Git. El repositorio ignora estos archivos y directorios; usa `.env.example` solo como plantilla sin secretos.
+No subas `.env`, `db.sqlite3`, entornos virtuales, `node_modules/` ni `dist/`. Git los ignora; utiliza `.env.example` solo como plantilla sin secretos.
