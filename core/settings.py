@@ -101,13 +101,21 @@ SWAGGER_SETTINGS = {
 # CORS: permite que la SPA (Vite) consuma la API desde otro origen.
 CORS_ALLOWED_ORIGINS = env_csv(
     'CORS_ALLOWED_ORIGINS',
-    ('http://localhost:5173', 'http://127.0.0.1:5173'),
+    (
+        'http://localhost:5173',
+        'http://127.0.0.1:5173',
+        'http://localhost:3000',
+        'http://127.0.0.1:3000',
+        'http://localhost:5174',
+        'http://127.0.0.1:5174',
+    ),
 )
 CORS_ALLOWED_ORIGINS = [origin.rstrip('/') for origin in CORS_ALLOWED_ORIGINS]
+CORS_ALLOW_CREDENTIALS = True
 
 MIDDLEWARE = [
-    'django.middleware.security.SecurityMiddleware',
     'corsheaders.middleware.CorsMiddleware',
+    'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
