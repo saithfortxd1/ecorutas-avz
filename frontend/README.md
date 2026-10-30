@@ -14,7 +14,7 @@ Es un proyecto **independiente** del backend Django: consume la API REST por HTT
 ## Requisitos previos
 
 - Node.js 18+ y npm
-- El backend de EcoRutas corriendo en `http://127.0.0.1:8000`
+- El backend de EcoRutas corriendo en `http://127.0.0.1:8011`
 
 ## Instalación y ejecución
 
@@ -24,7 +24,7 @@ npm install
 
 # 2. (Opcional) Configurar la URL de la API
 cp .env.example .env
-#   Edita VITE_API_BASE_URL si tu backend no está en http://127.0.0.1:8000/api
+#   Edita VITE_API_URL si tu backend no está en http://127.0.0.1:8011/api
 
 # 3. Levantar el servidor de desarrollo
 npm run dev
@@ -47,7 +47,7 @@ El backend ya incluye `django-cors-headers` configurado para permitir esta SPA
 y `CorsMiddleware` está registrado antes de `CommonMiddleware`.
 
 > **Alternativa sin CORS:** en `vite.config.js` está comentado un proxy `/api`. Descoméntalo y
-> define `VITE_API_BASE_URL=/api` en tu `.env` para que Vite reenvíe las peticiones al backend
+> define `VITE_API_URL=/api` en tu `.env` para que Vite reenvíe las peticiones al backend
 > (mismo origen, sin configurar CORS).
 
 ## Rutas de la aplicación

@@ -7,9 +7,9 @@ export default defineConfig({
   server: {
     port: 5173,
     // Alternativa sin CORS: descomenta este proxy y define
-    // VITE_API_BASE_URL=/api en tu .env para usar rutas relativas.
+    // VITE_API_URL=/api en tu .env para usar rutas relativas.
     // proxy: {
-    //   '/api': { target: 'http://127.0.0.1:8000', changeOrigin: true },
+    //   '/api': { target: 'http://127.0.0.1:8011', changeOrigin: true },
     // },
   },
 })

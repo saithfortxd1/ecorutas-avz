@@ -124,10 +124,10 @@ Aplica las migraciones y levanta Django:
 
 ```bash
 python manage.py migrate
-python manage.py runserver
+python manage.py runserver 8011
 ```
 
-La API local queda en `http://127.0.0.1:8000/api/`. Swagger está disponible en `http://127.0.0.1:8000/docs/`. Configura `ALLOWED_HOSTS` y `CORS_ALLOWED_ORIGINS` en `.env` para los dominios de tu entorno; Vite suele ejecutarse en `http://localhost:5173`.
+La API local queda en `http://127.0.0.1:8011/api/`. Swagger está disponible en `http://127.0.0.1:8011/docs/`. Configura `ALLOWED_HOSTS` y `CORS_ALLOWED_ORIGINS` en `.env` para los dominios de tu entorno; Vite suele ejecutarse en `http://localhost:5173`.
 
 Con `DEBUG=True`, el proyecto usa MD5 de Django para agilizar el desarrollo y conserva PBKDF2 como verificador de hashes existentes. Con `DEBUG=False` no activa ese hasher rápido y se mantienen los hashers seguros predeterminados de Django.
 
@@ -137,11 +137,11 @@ En otra terminal, desde la carpeta `frontend/` dentro de la raíz del repositori
 
 ```bash
 npm ci
-# Copia .env.example como .env si necesitas cambiar VITE_API_BASE_URL
+# Copia .env.example como .env si necesitas cambiar VITE_API_URL
 npm run dev
 ```
 
-Abre `http://localhost:5173/`. La URL de API por defecto es `http://127.0.0.1:8000/api`.
+Abre `http://localhost:5173/`. La URL de API configurada para desarrollo es `http://127.0.0.1:8011/api`.
 
 En el espacio de trabajo local también existe la carpeta hermana `ecorutas-frontend/`; si trabajas directamente desde esa copia, ejecuta los mismos comandos dentro de ella. Mantén sus archivos sincronizados con `frontend/` si quieres incluir los cambios en este repositorio.
 
