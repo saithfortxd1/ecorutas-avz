@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 import { Leaf, MapPin, Pencil, Trash2, UserRound } from 'lucide-react'
-import { getExperienceImage, getExperienceImageSrcSet } from '../utils/experienceImages.js'
+import { getExperienceImageInfo, getExperienceImageSrcSet } from '../utils/experienceImages.js'
+import { formatCurrencyCOP } from '../utils/formatters.js'
 
 export default function ExperienciaCard({ experiencia, canManage, onEdit, onDelete, index = 0 }) {
   const { titulo, descripcion, precioTexto, estado, categoriaNombre, anfitrionUsername } = experiencia
-  const [image, setImage] = useState(() => getExperienceImage(experiencia))
+  const imageInfo = getExperienceImageInfo(experiencia)
+  const [image, setImage] = useState(() => imageInfo.url)
   const reduceMotion = useReducedMotion()
   const position = Number.isFinite(Number(experiencia.latitud)) && Number.isFinite(Number(experiencia.longitud))
     ? `${Number(experiencia.latitud).toFixed(3)}, ${Number(experiencia.longitud).toFixed(3)}`
@@ -35,6 +37,9 @@ export default function ExperienciaCard({ experiencia, canManage, onEdit, onDele
           <Leaf size={13} aria-hidden="true" />{categoriaNombre}
         </span>
         <span className="absolute bottom-3 right-3 rounded-full bg-eco-950/80 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-sm">{estado}</span>
+        {imageInfo.credit && image && <a href={imageInfo.source} target="_blank" rel="noreferrer noopener" className="absolute bottom-3 left-3 max-w-[72%] truncate rounded-md bg-eco-950/75 px-2 py-1 text-[0.62rem] font-medium text-white/95 backdrop-blur-sm hover:bg-eco-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white" aria-label={`Crédito de imagen: ${imageInfo.credit}`}>
+          {imageInfo.credit}
+        </a>}
       </div>
 
       <div className="flex flex-1 flex-col p-5 sm:p-5">
@@ -47,7 +52,7 @@ export default function ExperienciaCard({ experiencia, canManage, onEdit, onDele
         {anfitrionUsername && <p className="mt-2 flex items-center gap-1.5 text-xs font-medium text-eco-800"><UserRound size={14} aria-hidden="true" />Anfitrión @{anfitrionUsername}</p>}
 
         <div className="mt-auto flex items-end justify-between gap-3 border-t border-stone-100 pt-4">
-          <p className="leading-tight text-stone-500"><span className="block text-[0.65rem] font-semibold uppercase tracking-[0.14em]">Precio</span><strong className="mt-1 inline-block text-xl font-bold text-eco-900">{precioTexto}</strong></p>
+          <p className="leading-tight text-stone-500"><span className="block text-[0.65rem] font-semibold uppercase tracking-[0.14em]">Precio</span><strong className="mt-1 inline-block text-xl font-bold text-eco-900">{formatCurrencyCOP(experiencia.precio ?? precioTexto)}</strong></p>
           {!canManage && <span className="text-xs text-stone-500">Precio publicado</span>}
           {canManage && <div className="flex gap-2">
             <button type="button" onClick={() => onEdit(experiencia)} aria-label={`Editar ${titulo}`} className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-stone-200 px-3 text-sm font-semibold text-stone-700 transition hover:border-eco-700 hover:text-eco-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-eco-600"><Pencil size={14} />Editar</button>

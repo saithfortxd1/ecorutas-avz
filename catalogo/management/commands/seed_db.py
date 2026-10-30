@@ -1,282 +1,212 @@
 import random
-from decimal import Decimal
 from datetime import date, time, timedelta
+from decimal import Decimal
 
 from django.conf import settings
-from django.core.management.base import BaseCommand, CommandError
 from django.contrib.auth import get_user_model
+from django.core.management.base import BaseCommand, CommandError
+from django.db import transaction
 from faker import Faker
 
-from catalogo.models import Categoria, Experiencia, FotoExperiencia, Disponibilidad, ExperienciaTraduccion
+from catalogo.models import Categoria, Disponibilidad, Experiencia, FotoExperiencia
 from usuarios.models import Recurso, Rol
 
 Usuario = get_user_model()
-
 fake = Faker('es_ES')
 
 
+# Ejemplos de referencia para el catálogo. Las descripciones evitan prometer
+# servicios, itinerarios o condiciones de operación que no estén configurados.
+EXPERIENCIAS_COLOMBIA = [
+    {
+        'titulo': 'Cabo de la Vela y dunas de La Guajira',
+        'categoria': 'Ecoturismo',
+        'descripcion': 'Explora los paisajes costeros y desérticos de Cabo de la Vela, en La Guajira. Consulta con el anfitrión los detalles, las condiciones locales y los servicios incluidos antes de reservar.',
+        'precio': '420000.00', 'latitud': '12.205300', 'longitud': '-72.176700',
+        'imagen': 'https://images.unsplash.com/photo-1644849823235-7d3d55172383?w=1000&q=82',
+    },
+    {
+        'titulo': 'Trekking a Ciudad Perdida',
+        'categoria': 'Senderismo',
+        'descripcion': 'Recorrido de trekking hacia Ciudad Perdida, en la Sierra Nevada de Santa Marta. La operación y los requisitos del recorrido deben confirmarse directamente con el anfitrión.',
+        'precio': '1200000.00', 'latitud': '11.037000', 'longitud': '-73.923000',
+        'imagen': 'https://images.unsplash.com/photo-1612442560597-393c75377041?w=1000&q=82',
+    },
+    {
+        'titulo': 'Sendero y playas del Parque Nacional Natural Tayrona',
+        'categoria': 'Senderismo',
+        'descripcion': 'Explora senderos y playas del Parque Nacional Natural Tayrona, en el Magdalena. Verifica con el anfitrión la disponibilidad y las condiciones de ingreso vigentes.',
+        'precio': '180000.00', 'latitud': '11.312000', 'longitud': '-74.036000',
+        'imagen': 'https://images.unsplash.com/photo-1635079552384-dd8adecd8a7c?w=1000&q=82',
+    },
+    {
+        'titulo': 'Ruta del Café y Valle del Cocora',
+        'categoria': 'Senderismo',
+        'descripcion': 'Conoce los paisajes del Valle del Cocora, en Salento, Quindío, y el entorno cafetero de la región. Confirma con el anfitrión el alcance y los servicios de la experiencia.',
+        'precio': '150000.00', 'latitud': '4.637000', 'longitud': '-75.570000',
+        'imagen': 'https://images.unsplash.com/photo-1737914692165-b0428cca0104?w=1000&q=82',
+    },
+    {
+        'titulo': 'Avistamiento de ballenas en Bahía Solano',
+        'categoria': 'Avistamiento de fauna',
+        'descripcion': 'Experiencia de observación de fauna marina en Bahía Solano, Chocó. El avistamiento depende de la temporada y las condiciones naturales; confirma fechas y operación con el anfitrión.',
+        'precio': '650000.00', 'latitud': '6.227000', 'longitud': '-77.407000',
+        'imagen': 'https://commons.wikimedia.org/wiki/Special:FilePath/Humpback_whale_breaching_off_the_coast_of_Choco,_Colombia.jpg?width=1000',
+    },
+    {
+        'titulo': 'Caño Cristales y Serranía de la Macarena',
+        'categoria': 'Ecoturismo',
+        'descripcion': 'Explora el entorno natural de Caño Cristales y la Serranía de la Macarena, Meta. Consulta temporadas, permisos y condiciones de visita con el anfitrión.',
+        'precio': '1000000.00', 'latitud': '2.206000', 'longitud': '-73.794000',
+        'imagen': 'https://commons.wikimedia.org/wiki/Special:FilePath/CA%C3%91O_CRISTALES_EL_R%C3%8DO_DE_LOS_CINCO_COLORES.jpg?width=1000',
+    },
+    {
+        'titulo': 'Kayak en el Santuario de Fauna y Flora Los Flamencos',
+        'categoria': 'Kayak',
+        'descripcion': 'Recorrido en kayak en el entorno del Santuario de Fauna y Flora Los Flamencos, La Guajira. Confirma con el anfitrión las condiciones de navegación, disponibilidad y servicios incluidos.',
+        'precio': '120000.00', 'latitud': '11.413000', 'longitud': '-72.454000',
+        'imagen': 'https://commons.wikimedia.org/wiki/Special:FilePath/Flamencos_en_La_Guajira.jpg?width=1000',
+    },
+]
+
+
 class Command(BaseCommand):
-    help = 'Poblar la base de datos con datos de prueba (Categorías, Usuarios, Experiencias, Fotos, Disponibilidades, Traducciones)'
+    help = 'Poblar EcoRutas con experiencias colombianas y datos opcionales de prueba.'
 
     def add_arguments(self, parser):
-        parser.add_argument(
-            '--force',
-            action='store_true',
-            help='Permitir la ejecución aunque DEBUG=False (puede borrar datos reales).',
-        )
-        parser.add_argument(
-            '--clean',
-            action='store_true',
-            help='Eliminar datos existentes antes de poblar',
-        )
-        parser.add_argument(
-            '--categorias',
-            type=int,
-            default=10,
-            help='Número de categorías a crear',
-        )
-        parser.add_argument(
-            '--usuarios',
-            type=int,
-            default=20,
-            help='Número de usuarios a crear',
-        )
-        parser.add_argument(
-            '--experiencias',
-            type=int,
-            default=50,
-            help='Número de experiencias a crear',
-        )
-        parser.add_argument(
-            '--disponibilidades',
-            type=int,
-            default=100,
-            help='Número de disponibilidades a crear',
-        )
+        parser.add_argument('--force', action='store_true', help='Permitir ejecución con DEBUG=False.')
+        parser.add_argument('--clean', action='store_true', help='Eliminar todos los datos de prueba antes de poblar (incluye usuarios no superusuario).')
+        parser.add_argument('--reemplazar-experiencias', action='store_true', help='Reemplazar únicamente las experiencias y sus fotos, traducciones y disponibilidades. Conserva usuarios, roles y categorías.')
+        parser.add_argument('--categorias', type=int, default=10, help='Número de categorías generales opcionales a crear.')
+        parser.add_argument('--usuarios', type=int, default=0, help='Número de usuarios de prueba opcionales a crear (por defecto: ninguno).')
+        parser.add_argument('--experiencias', type=int, default=7, help='Número de experiencias colombianas (máximo 7).')
+        parser.add_argument('--disponibilidades', type=int, default=0, help='Número de disponibilidades de prueba opcionales a crear (por defecto: ninguna).')
 
     def handle(self, *args, **options):
-        # Salvaguarda: este comando puede borrar usuarios y catálogo reales.
-        if not settings.DEBUG and not options.get('force'):
-            raise CommandError(
-                'seed_db está deshabilitado cuando DEBUG=False porque puede '
-                'borrar datos reales. Ejecuta con --force solo si es intencional.'
-            )
-
-        clean = options['clean']
-        n_categorias = options['categorias']
-        n_usuarios = options['usuarios']
-        n_experiencias = options['experiencias']
-        n_disponibilidades = options['disponibilidades']
+        if not settings.DEBUG and not options['force']:
+            raise CommandError('seed_db está deshabilitado cuando DEBUG=False. Usa --force solo si es intencional.')
+        if options['experiencias'] < 0 or options['usuarios'] < 0 or options['disponibilidades'] < 0:
+            raise CommandError('Las cantidades no pueden ser negativas.')
 
         self.crear_rbac()
-
-        if clean:
-            self.stdout.write(self.style.WARNING('Eliminando datos existentes...'))
+        if options['clean']:
+            self.stdout.write(self.style.WARNING('Eliminando datos existentes, incluidos usuarios no superusuario...'))
             Disponibilidad.objects.all().delete()
             FotoExperiencia.objects.all().delete()
-            ExperienciaTraduccion.objects.all().delete()
             Experiencia.objects.all().delete()
             Categoria.objects.all().delete()
             Usuario.objects.filter(is_superuser=False).delete()
-            self.stdout.write(self.style.SUCCESS('Datos eliminados.'))
 
-        self.stdout.write(self.style.NOTICE('Creando categorías...'))
-        categorias = self.crear_categorias(n_categorias)
-
-        self.stdout.write(self.style.NOTICE('Creando usuarios...'))
-        usuarios = self.crear_usuarios(n_usuarios)
-
-        anfitriones = [u for u in usuarios if u.rol == 'anfitrion']
-        if not anfitriones:
-            self.stdout.write(self.style.ERROR('No hay anfitriones. Creando al menos uno...'))
-            anfitrion = Usuario.objects.create_user(
+        categorias = self.crear_categorias(options['categorias'])
+        usuarios = self.crear_usuarios(options['usuarios'])
+        host = Usuario.objects.filter(roles__nombre='Anfitrión').order_by('id').first()
+        if not host:
+            host, _ = Usuario.objects.get_or_create(
                 username='anfitrion_test',
-                email='anfitrion@test.com',
-                password='testpass123',
-                first_name='Juan',
-                last_name='Pérez',
-                documento_identidad='12345678A',
-                estado_verificacion='aprobado'
+                defaults={
+                    'email': 'anfitrion@test.com', 'first_name': 'Anfitrión',
+                    'last_name': 'EcoRutas', 'documento_identidad': '12345678A',
+                    'estado_verificacion': 'aprobado',
+                },
             )
-            anfitrion.roles.add(Rol.objects.get(nombre='Anfitrión'))
-            anfitriones = [anfitrion]
+            if not host.password or not host.has_usable_password():
+                host.set_password('testpass123')
+                host.save(update_fields=['password'])
+            host.roles.add(Rol.objects.get(nombre='Anfitrión'))
 
-        self.stdout.write(self.style.NOTICE('Creando experiencias...'))
-        experiencias = self.crear_experiencias(n_experiencias, categorias, anfitriones)
+        catalogo = EXPERIENCIAS_COLOMBIA[:options['experiencias']]
+        if options['reemplazar_experiencias']:
+            self.stdout.write(self.style.WARNING('Reemplazando experiencias y dependencias; usuarios, roles y categorías se conservan.'))
+            with transaction.atomic():
+                Experiencia.objects.all().delete()
+                experiencias = self.crear_experiencias(catalogo, categorias, host)
+                self.crear_fotos(experiencias, catalogo)
+        else:
+            experiencias = self.crear_experiencias(catalogo, categorias, host)
+            self.crear_fotos(experiencias, catalogo)
 
-        self.stdout.write(self.style.NOTICE('Creando fotos...'))
-        self.crear_fotos(experiencias)
-
-        self.stdout.write(self.style.NOTICE('Creando traducciones...'))
-        self.crear_traducciones(experiencias)
-
-        self.stdout.write(self.style.NOTICE('Creando disponibilidades...'))
-        self.crear_disponibilidades(n_disponibilidades, experiencias)
+        if options['disponibilidades'] and experiencias:
+            self.crear_disponibilidades(options['disponibilidades'], experiencias)
 
         self.stdout.write(self.style.SUCCESS(
-            f'\n[OK] Base de datos poblada exitosamente:'
-            f'\n  - {len(categorias)} categorias'
-            f'\n  - {len(usuarios)} usuarios ({len(anfitriones)} anfitriones)'
-            f'\n  - {len(experiencias)} experiencias'
-            f'\n  - {n_disponibilidades} disponibilidades'
-            f'\n  - Fotos y traducciones asociadas'
+            f'Catálogo colombiano listo: {len(experiencias)} experiencias, '
+            f'{len(categorias)} categorías disponibles, {len(usuarios)} usuarios de prueba.'
         ))
 
     def crear_rbac(self):
-        self.stdout.write(self.style.NOTICE('Configurando roles y recursos RBAC...'))
         roles = {name: Rol.objects.get_or_create(nombre=name)[0] for name in ('Administrador', 'Anfitrión', 'Turista')}
-        recurso, _ = Recurso.objects.update_or_create(
-            nombre='Catálogo',
-            defaults={
-                'path': '/experiencias',
-                'icono': 'map',
-                'permisos': [
-                    {'path': '/api/catalogo/experiencias/', 'methods': ['get', 'post', 'put', 'patch', 'delete']},
-                    {'path': '/api/catalogo/categorias/', 'methods': ['get', 'post', 'put', 'patch', 'delete']},
-                    {'path': '/api/catalogo/disponibilidades/', 'methods': ['get', 'post', 'put', 'patch', 'delete']},
-                ],
-            },
-        )
-        gestion_usuarios, _ = Recurso.objects.update_or_create(
-            nombre='Gestión de Usuarios',
-            defaults={'path': '/admin/usuarios', 'icono': 'users', 'permisos': [{'path': '/api/usuarios/admin/', 'methods': ['get', 'post', 'put', 'patch', 'delete']}]},
-        )
-        gestion_roles, _ = Recurso.objects.update_or_create(
-            nombre='Gestión de Roles',
-            defaults={'path': '/admin/roles', 'icono': 'shield', 'permisos': [{'path': '/api/usuarios/roles/', 'methods': ['get', 'post', 'put', 'patch', 'delete']}]},
-        )
-        gestion_recursos, _ = Recurso.objects.update_or_create(
-            nombre='Gestión de Recursos',
-            defaults={'path': '/admin/recursos', 'icono': 'grid', 'permisos': [{'path': '/api/usuarios/recursos/', 'methods': ['get', 'post', 'put', 'patch', 'delete']}]},
-        )
-        roles['Administrador'].recursos.add(recurso, gestion_usuarios, gestion_roles, gestion_recursos)
+        recurso, _ = Recurso.objects.update_or_create(nombre='Catálogo', defaults={
+            'path': '/experiencias', 'icono': 'map', 'permisos': [
+                {'path': '/api/catalogo/experiencias/', 'methods': ['get', 'post', 'put', 'patch', 'delete']},
+                {'path': '/api/catalogo/categorias/', 'methods': ['get', 'post', 'put', 'patch', 'delete']},
+                {'path': '/api/catalogo/disponibilidades/', 'methods': ['get', 'post', 'put', 'patch', 'delete']},
+            ],
+        })
+        admin_resources = []
+        for name, path, icon in (
+            ('Gestión de Usuarios', '/admin/usuarios', 'users'),
+            ('Gestión de Roles', '/admin/roles', 'shield'),
+            ('Gestión de Recursos', '/admin/recursos', 'grid'),
+        ):
+            resource, _ = Recurso.objects.update_or_create(nombre=name, defaults={
+                'path': path, 'icono': icon,
+                'permisos': [{'path': path.replace('/admin', '/api/usuarios') + '/', 'methods': ['get', 'post', 'put', 'patch', 'delete']}],
+            })
+            admin_resources.append(resource)
+        roles['Administrador'].recursos.add(recurso, *admin_resources)
         roles['Anfitrión'].recursos.add(recurso)
         roles['Turista'].recursos.add(recurso)
-        # Asigna el rol dinámico equivalente a los usuarios preexistentes y nuevos.
         for user in Usuario.objects.all().iterator():
-            role_name = 'Administrador' if user.is_staff or user.rol == 'administrador' else ('Anfitrión' if user.rol == 'anfitrion' else 'Turista')
+            role_name = 'Administrador' if user.is_staff else ('Anfitrión' if user.roles.filter(nombre='Anfitrión').exists() else 'Turista')
             user.roles.add(roles[role_name])
 
     def crear_categorias(self, n):
-        nombres_categorias = [
-            'Senderismo', 'Ciclismo', 'Observación de aves', 'Kayak', 'Escalada',
-            'Rutas a caballo', 'Fotografía de naturaleza', 'Camping', 'Rafting', 'Pesca deportiva',
-            'Espeleología', 'Barranquismo', 'Parapente', 'Buceo', 'Surf',
-            'Nordic Walking', 'Orientación', 'Geocaching', 'Rutas 4x4', 'Astronomía'
-        ]
-        categorias = []
-        for i in range(min(n, len(nombres_categorias))):
-            cat, created = Categoria.objects.get_or_create(nombre=nombres_categorias[i])
-            categorias.append(cat)
-        return categorias
+        names = ['Senderismo', 'Ciclismo', 'Observación de aves', 'Avistamiento de fauna', 'Kayak', 'Escalada', 'Rutas a caballo', 'Fotografía de naturaleza', 'Camping', 'Rafting', 'Pesca deportiva']
+        result = {name: Categoria.objects.get_or_create(nombre=name)[0] for name in names[:min(n, len(names))]}
+        for name in {experience['categoria'] for experience in EXPERIENCIAS_COLOMBIA}:
+            result[name] = Categoria.objects.get_or_create(nombre=name)[0]
+        return result
 
     def crear_usuarios(self, n):
-        usuarios = []
-        for i in range(n):
+        users = []
+        for _ in range(n):
             rol = random.choice(['turista', 'anfitrion'])
-            username = fake.unique.user_name()
-            email = fake.unique.email()
-            first_name = fake.first_name()
-            last_name = fake.last_name()
-
-            user = Usuario.objects.create_user(
-                username=username,
-                email=email,
-                password='testpass123',
-                first_name=first_name,
-                last_name=last_name,
-            )
-            role_name = 'Anfitrión' if rol == 'anfitrion' else 'Turista'
-            user.roles.add(Rol.objects.get(nombre=role_name))
-
+            user = Usuario.objects.create_user(username=fake.unique.user_name(), email=fake.unique.email(), password='testpass123', first_name=fake.first_name(), last_name=fake.last_name())
+            user.roles.add(Rol.objects.get(nombre='Anfitrión' if rol == 'anfitrion' else 'Turista'))
             if rol == 'anfitrion':
                 user.documento_identidad = fake.unique.bothify(text='??########')
-                user.estado_verificacion = random.choice(['aprobado', 'pendiente', 'aprobado', 'aprobado'])
+                user.estado_verificacion = random.choice(['aprobado', 'pendiente', 'aprobado'])
                 user.save()
+            users.append(user)
+        return users
 
-            usuarios.append(user)
-        return usuarios
-
-    def crear_experiencias(self, n, categorias, anfitriones):
+    def crear_experiencias(self, catalogo, categorias, anfitrion):
         experiencias = []
-        titulos_base = [
-            'Ruta por el valle', 'Ascensión al pico', 'Paseo en kayak', 'Avistamiento de fauna',
-            'Ruta en bicicleta de montaña', 'Caminata nocturna', 'Taller de fotografía',
-            'Acampada bajo las estrellas', 'Descenso de barrancos', 'Vuelo en parapente',
-            'Inmersión en arrecife', 'Clase de surf', 'Ruta a caballo al atardecer',
-            'Exploración de cuevas', 'Pesca en río', 'Senderismo familiar',
-            'Ruta geológica', 'Observación astronómica', 'Nordic walking costero',
-            'Ruta en 4x4 por la sierra'
-        ]
-
-        for i in range(n):
-            anfitrion = random.choice(anfitriones)
-            categoria = random.choice(categorias)
-            titulo = f"{random.choice(titulos_base)} {fake.word().capitalize()} {i+1}"
-
-            exp = Experiencia.objects.create(
-                anfitrion=anfitrion,
-                categoria=categoria,
-                titulo=titulo,
-                descripcion=fake.paragraph(nb_sentences=5),
-                precio_unitario=Decimal(random.uniform(25, 200)).quantize(Decimal('0.01')),
-                latitud=Decimal(random.uniform(-90, 90)).quantize(Decimal('0.000001')),
-                longitud=Decimal(random.uniform(-180, 180)).quantize(Decimal('0.000001')),
-                estado=random.choice(['Activa', 'Activa', 'Activa', 'Inactiva', 'Borrador']),
+        for item in catalogo:
+            categoria = categorias.get(item['categoria']) or Categoria.objects.get(nombre=item['categoria'])
+            experiencia, _ = Experiencia.objects.update_or_create(
+                titulo=item['titulo'],
+                defaults={
+                    'anfitrion': anfitrion, 'categoria': categoria,
+                    'descripcion': item['descripcion'], 'precio_unitario': Decimal(item['precio']),
+                    'latitud': Decimal(item['latitud']), 'longitud': Decimal(item['longitud']), 'estado': 'Activa',
+                },
             )
-            experiencias.append(exp)
+            experiencias.append(experiencia)
         return experiencias
 
-    def crear_fotos(self, experiencias):
-        urls_fotos = [
-            'https://images.unsplash.com/photo-1504280390367-361c6d9f38f4',
-            'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05',
-            'https://images.unsplash.com/photo-1551632811-561732d1e306',
-            'https://images.unsplash.com/photo-1433086966358-54859d0ed716',
-            'https://images.unsplash.com/photo-1472214103451-9374bd1c798e',
-            'https://images.unsplash.com/photo-1506905925346-21bda4d32df4',
-            'https://images.unsplash.com/photo-1447752875215-b2761acb3c5d',
-            'https://images.unsplash.com/photo-1501785888041-af3ef285b470',
-            'https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e',
-            'https://images.unsplash.com/photo-1506744038136-46273834b3fb',
-        ]
-
+    def crear_fotos(self, experiencias, catalogo):
+        details = {item['titulo']: item for item in catalogo}
         for exp in experiencias:
-            num_fotos = random.randint(1, 4)
-            for j in range(num_fotos):
-                FotoExperiencia.objects.create(
-                    experiencia=exp,
-                    url_foto=random.choice(urls_fotos) + f'?w=800&q=80&sig={random.randint(1,1000)}',
-                    es_principal=(j == 0),
-                )
-
-    def crear_traducciones(self, experiencias):
-        idiomas = ['en', 'fr', 'de', 'it', 'pt']
-        for exp in experiencias:
-            num_traducciones = random.randint(1, 3)
-            for idioma in random.sample(idiomas, num_traducciones):
-                ExperienciaTraduccion.objects.create(
-                    experiencia=exp,
-                    idioma=idioma,
-                    titulo_traducido=fake.sentence(nb_words=6).rstrip('.'),
-                    descripcion_traducida=fake.paragraph(nb_sentences=3),
-                )
+            item = details[exp.titulo]
+            photo, _ = FotoExperiencia.objects.get_or_create(experiencia=exp, es_principal=True, defaults={'url_foto': item['imagen']})
+            if photo.url_foto != item['imagen']:
+                photo.url_foto = item['imagen']
+                photo.save(update_fields=['url_foto'])
 
     def crear_disponibilidades(self, n, experiencias):
         hoy = date.today()
         for _ in range(n):
             exp = random.choice(experiencias)
-            dias_futuros = random.randint(1, 180)
-            fecha = hoy + timedelta(days=dias_futuros)
-
-            hora_inicio = time(random.randint(8, 14), 0)
-            duracion = random.randint(2, 8)
-            hora_fin = time(min(23, hora_inicio.hour + duracion), 0)
-
-            Disponibilidad.objects.create(
-                experiencia=exp,
-                fecha=fecha,
-                hora_inicio=hora_inicio,
-                hora_fin=hora_fin,
-                cupos_totales=random.randint(5, 30),
-            )
+            start = time(random.randint(8, 14), 0)
+            Disponibilidad.objects.create(experiencia=exp, fecha=hoy + timedelta(days=random.randint(1, 180)), hora_inicio=start, hora_fin=time(min(23, start.hour + random.randint(2, 8)), 0), cupos_totales=random.randint(5, 30))
