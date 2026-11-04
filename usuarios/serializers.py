@@ -35,17 +35,33 @@ class UsuarioRegistroSerializer(serializers.ModelSerializer):
 class UsuarioMeSerializer(serializers.ModelSerializer):
     rol_display = serializers.CharField(source='get_rol_display', read_only=True)
     roles = serializers.StringRelatedField(many=True, read_only=True)
+    recursos = serializers.SerializerMethodField()
     perfil_anfitrion = serializers.SerializerMethodField()
 
     class Meta:
         model = Usuario
-        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'rol', 'rol_display', 'roles', 'is_staff', 'is_superuser', 'documento_identidad', 'estado_verificacion', 'perfil_anfitrion', 'date_joined']
+        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'rol', 'rol_display', 'roles', 'is_staff', 'is_superuser', 'documento_identidad', 'estado_verificacion', 'perfil_anfitrion', 'date_joined', 'recursos']
         read_only_fields = fields
 
     def get_perfil_anfitrion(self, obj):
         if obj.rol != 'anfitrion':
             return None
         return {'documento_identidad': obj.documento_identidad, 'estado_verificacion': obj.estado_verificacion, 'estado_verificacion_display': obj.get_estado_verificacion_display()}
+
+    def get_recursos(self, obj):
+        """Devuelve los recursos accesibles para el usuario basados en sus roles."""
+        from usuarios.models import Recurso
+        recursos = Recurso.objects.filter(roles__usuarios__pk=obj.pk).distinct()
+        return [
+            {
+                'id': r.id,
+                'nombre': r.nombre,
+                'path': r.path,
+                'icono': r.icono,
+                'permisos': r.permisos,
+            }
+            for r in recursos
+        ]
 
 
 class RecursoSerializer(serializers.ModelSerializer):
