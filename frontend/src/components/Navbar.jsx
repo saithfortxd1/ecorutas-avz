@@ -16,12 +16,14 @@ const ICONS = {
 }
 
 /**
- * Barra superior con RBAC:
+ * Barra superior con RBAC dinámico basado en recursos del usuario:
  * - Muestra el usuario y su rol.
+ * - Los enlaces de navegación se generan dinámicamente según los recursos del usuario.
  * - El botón "Crear Experiencia" solo aparece para rol 'anfitrion'.
+ * - El botón de actualizar menú/permisos refresca el perfil y recursos.
  */
 export default function Navbar({ onNew }) {
-  const { user, menu, menuRefreshing, refreshMenu, isAnfitrion, isAdministrador, logout } = useAuth()
+  const { user, recursos, menuRefreshing, refreshMenu, isAnfitrion, isAdministrador, logout } = useAuth()
   const navigate = useNavigate()
 
   const handleLogout = () => {
@@ -38,6 +40,18 @@ export default function Navbar({ onNew }) {
     }
   }
 
+  // Genera los enlaces de navegación a partir de los recursos del usuario
+  const navigationItems = user?.recursos
+    ? user.recursos
+        .filter((r) => r.path && r.path.startsWith('/'))
+        .map((recurso) => ({
+          id: recurso.id,
+          nombre: recurso.nombre,
+          path: recurso.path,
+          icono: recurso.icono || 'compass',
+        }))
+    : []
+
   return (
     <header className="sticky top-0 z-30 border-b border-white/15 bg-eco-800/80 text-white shadow-lg backdrop-blur-md">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3">
@@ -47,7 +61,7 @@ export default function Navbar({ onNew }) {
 
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <nav aria-label="Navegación principal" className="flex flex-wrap items-center gap-2">
-            {menu.map((item) => (
+            {navigationItems.map((item) => (
               <Link
                 key={item.id}
                 to={item.path}

@@ -10,6 +10,7 @@ export function normalizeUsuario(raw) {
     rol: raw.rol,
     rolDisplay: raw.rol_display ?? raw.rol,
     roles: Array.isArray(raw.roles) ? raw.roles : [],
+    recursos: Array.isArray(raw.recursos) ? raw.recursos : [],
     documentoIdentidad: raw.documento_identidad ?? null,
     estadoVerificacion: raw.estado_verificacion ?? null,
     perfilAnfitrion: raw.perfil_anfitrion ?? null,

@@ -1,5 +1,4 @@
 import axios from 'axios'
-import { toast } from 'sonner'
 
 export const ACCESS_KEY = 'ecorutas_access'
 export const REFRESH_KEY = 'ecorutas_refresh'
@@ -23,7 +22,7 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 })
 
-// --- Interceptor de petición: adjunta Bearer <access_token> ---
+// --- Interceptor de peticion: adjunta Bearer <access_token> ---
 api.interceptors.request.use((config) => {
   const access = tokenStore.getAccess()
   if (access && !config.skipAuth) {
@@ -33,7 +32,7 @@ api.interceptors.request.use((config) => {
   return config
 })
 
-// --- Renovación automática del token (single-flight) ---
+// --- Renovacion automatica del token (single-flight) ---
 let refreshPromise = null
 
 async function refreshAccessToken() {
@@ -44,7 +43,12 @@ async function refreshAccessToken() {
   return data.access
 }
 
-// --- Interceptor de respuesta: reintenta una vez tras refrescar ante un 401 ---
+// --- Interceptor de respuesta ---
+// Politica de sesion:
+//  - 403 (autenticado pero sin permiso de recurso): NUNCA se cierra la sesion.
+//    Se propaga el error para que la vista muestre un bloqueo limpio.
+//  - 401: se intenta refrescar el access token una sola vez y se reintenta.
+//    Solo si el refresh falla (token invalido o expirado) se limpia la sesion.
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
@@ -52,7 +56,7 @@ api.interceptors.response.use(
     const status = error.response?.status
 
     if (status === 403) {
-      toast.error('No tienes permisos para realizar esta acción.')
+      return Promise.reject(error)
     }
 
     const puedeRefrescar =
@@ -78,6 +82,7 @@ api.interceptors.response.use(
       original.headers.Authorization = `Bearer ${newAccess}`
       return api(original)
     } catch (refreshError) {
+      // Unico punto donde se cierra la sesion: token invalido/expirado.
       tokenStore.clear()
       window.dispatchEvent(new Event('ecorutas:logout'))
       return Promise.reject(refreshError)
