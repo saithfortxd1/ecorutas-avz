@@ -20,16 +20,21 @@ export function AuthProvider({ children }) {
     if (!expectedUserId || authService.getTokenUserId() !== expectedUserId) return null
 
     if (profileResult.status === 'rejected') {
+      // Solo un fallo de autenticacion (401) cierra la sesion. Un 403 (sin
+      // permiso) o un 5xx/red NO debe expulsar al usuario.
+      const status = profileResult.reason?.response?.status
+      const esErrorDeAutenticacion = status === 401
+
       if (fallback) {
         setUser(fallback.user)
         setMenu(fallback.menu)
-      } else if (clearOnError) {
+      } else if (clearOnError && esErrorDeAutenticacion) {
         authService.logout()
         setUser(null)
         setMenu([])
       }
       setLoading(false)
-      if (clearOnError && !fallback) throw profileResult.reason
+      if (clearOnError && esErrorDeAutenticacion && !fallback) throw profileResult.reason
       return fallback?.user ?? null
     }
 
@@ -125,6 +130,7 @@ export function AuthProvider({ children }) {
     authService.logout()
     setUser(null)
     setMenu([])
+    setLoading(false)
   }, [])
 
   const refreshMenu = useCallback(async () => {
@@ -148,6 +154,7 @@ export function AuthProvider({ children }) {
     () => ({
       user,
       menu,
+      recursos: user?.recursos ?? [], // recursos del usuario desde /api/usuarios/me/
       menuRefreshing,
       loading,
       login,

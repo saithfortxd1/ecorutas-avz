@@ -67,7 +67,9 @@ export async function fetchMe() {
   const { data } = await api.get('/usuarios/me/')
   const user = normalizeUsuario(data)
   const userId = getTokenUserId()
-  if (userId && String(user.id) === userId) writeStored(`${USER_KEY_PREFIX}${userId}`, user, SESSION_STALE_LIMIT)
+  if (userId && String(user.id) === userId) {
+    writeStored(`${USER_KEY_PREFIX}${userId}`, user, SESSION_STALE_LIMIT)
+  }
   return user
 }
 
