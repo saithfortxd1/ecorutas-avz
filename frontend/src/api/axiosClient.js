@@ -17,8 +17,13 @@ export const tokenStore = {
   },
 }
 
+// Base de la API configurable por entorno (Vite). Fallback al puerto local 8011.
+const API_BASE_URL = String(
+  import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8011/api',
+).replace(/\/+$/, '')
+
 const api = axios.create({
-  baseURL: 'http://127.0.0.1:8011/api',
+  baseURL: API_BASE_URL,
   headers: { 'Content-Type': 'application/json' },
 })
 
