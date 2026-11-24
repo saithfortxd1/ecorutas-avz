@@ -2,6 +2,8 @@
 
 Plataforma de turismo de naturaleza con una API en **Django REST Framework** y una aplicación SPA en **React + Vite**. La API administra cuentas, catálogo y permisos; React consume sus endpoints con Axios y autenticación JWT.
 
+> **Versión actual:** `v1.1.0` — ver `CHANGELOG.md` y `CONTRIBUTING.md`.
+
 ## Estructura del proyecto
 
 En el espacio de trabajo local, los proyectos aparecen como dos carpetas hermanas:
