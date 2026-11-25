@@ -1,6 +1,7 @@
 import api from '../api/axiosClient.js'
 import { cache } from '../utils/cache.js'
 import { normalizeExperiencia, experienciaToPayload } from '../models/Experiencia.js'
+import { normalizeDisponibilidad } from '../models/Disponibilidad.js'
 
 const PREFIX = 'experiencias'
 const TTL = 30_000 // 30 s
@@ -28,6 +29,27 @@ export function listExperiencias({ search = '', ordering = '' } = {}, { force = 
       api
         .get('/catalogo/experiencias/', { params: buildParams(search, ordering) })
         .then(({ data }) => toArray(data).map(normalizeExperiencia)),
+    { ttl: TTL, force },
+  )
+}
+
+/** GET /api/catalogo/experiencias/{id}/ -> detalle de un plan (con caché). */
+export function getExperiencia(id, { force = false } = {}) {
+  return cache.getOrSet(
+    `${PREFIX}:item:${id}`,
+    () => api.get(`/catalogo/experiencias/${id}/`).then(({ data }) => normalizeExperiencia(data)),
+    { ttl: TTL, force },
+  )
+}
+
+/** GET /api/catalogo/disponibilidades/?experiencia={id} -> cupos del plan (con caché). */
+export function listDisponibilidades(experienciaId, { force = false } = {}) {
+  return cache.getOrSet(
+    `${PREFIX}:disp:${experienciaId}`,
+    () =>
+      api
+        .get('/catalogo/disponibilidades/', { params: { experiencia: experienciaId } })
+        .then(({ data }) => toArray(data).map(normalizeDisponibilidad)),
     { ttl: TTL, force },
   )
 }

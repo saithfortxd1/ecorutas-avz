@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { motion, useReducedMotion } from 'framer-motion'
 import { Leaf, MapPin, Pencil, Trash2, UserRound } from 'lucide-react'
 import { getExperienceImageInfo, getExperienceImageSrcSet } from '../utils/experienceImages.js'
@@ -53,11 +54,13 @@ export default function ExperienciaCard({ experiencia, canManage, onEdit, onDele
 
         <div className="mt-auto flex items-end justify-between gap-3 border-t border-stone-100 pt-4">
           <p className="leading-tight text-stone-500"><span className="block text-[0.65rem] font-semibold uppercase tracking-[0.14em]">Precio</span><strong className="mt-1 inline-block text-xl font-bold text-eco-900">{formatCurrencyCOP(experiencia.precio ?? precioTexto)}</strong></p>
-          {!canManage && <span className="text-xs text-stone-500">Precio publicado</span>}
-          {canManage && <div className="flex gap-2">
-            <button type="button" onClick={() => onEdit(experiencia)} aria-label={`Editar ${titulo}`} className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-stone-200 px-3 text-sm font-semibold text-stone-700 transition hover:border-eco-700 hover:text-eco-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-eco-600"><Pencil size={14} />Editar</button>
-            <button type="button" onClick={() => onDelete(experiencia)} aria-label={`Eliminar ${titulo}`} className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-red-100 px-3 text-sm font-semibold text-red-700 transition hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600"><Trash2 size={14} />Eliminar</button>
-          </div>}
+          <div className="flex flex-col items-end gap-2">
+            <Link to={`/experiencias/${experiencia.id}`} className="text-sm font-semibold text-eco-800 underline-offset-2 hover:underline">Ver detalle →</Link>
+            {canManage && <div className="flex gap-2">
+              <button type="button" onClick={() => onEdit(experiencia)} aria-label={`Editar ${titulo}`} className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-stone-200 px-3 text-sm font-semibold text-stone-700 transition hover:border-eco-700 hover:text-eco-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-eco-600"><Pencil size={14} />Editar</button>
+              <button type="button" onClick={() => onDelete(experiencia)} aria-label={`Eliminar ${titulo}`} className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-red-100 px-3 text-sm font-semibold text-red-700 transition hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600"><Trash2 size={14} />Eliminar</button>
+            </div>}
+          </div>
         </div>
       </div>
     </motion.article>
