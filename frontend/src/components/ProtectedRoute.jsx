@@ -32,12 +32,15 @@ function ForbiddenPanel({ pathname }) {
  * Bloquea rutas no autorizadas.
  *
  * - Sin sesión: redirige a /login conservando el origen.
- * - Con sesión pero sin recurso para la ruta: muestra un bloqueo limpio en
- *   lugar de expulsar al usuario (no cierra sesión).
+ * - `requireResource` (por defecto true): la ruta exige un recurso RBAC del
+ *   usuario (p. ej. /admin/*, /experiencias). Si no lo tiene, muestra un
+ *   bloqueo limpio sin cerrar sesión.
+ * - `requireResource=false`: la ruta solo exige sesión (p. ej. /mis-reservas),
+ *   accesible para cualquier usuario autenticado (incluido Turista).
  * - Si los recursos aún no están disponibles (array vacío), se deja pasar para
  *   no producir falsos negativos mientras carga el perfil.
  */
-export default function ProtectedRoute({ children }) {
+export default function ProtectedRoute({ children, requireResource = true }) {
   const { isAuthenticated, loading, recursos } = useAuth()
   const location = useLocation()
 
@@ -47,7 +50,7 @@ export default function ProtectedRoute({ children }) {
     return <Navigate to="/login" state={{ from: location }} replace />
   }
 
-  if (recursos.length > 0 && !canAccessPath(recursos, location.pathname)) {
+  if (requireResource && recursos.length > 0 && !canAccessPath(recursos, location.pathname)) {
     return <ForbiddenPanel pathname={location.pathname} />
   }
 

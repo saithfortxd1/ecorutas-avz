@@ -38,7 +38,7 @@ export default function App() {
         <Route
           path="/mis-reservas"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requireResource={false}>
               <MisReservasPage />
             </ProtectedRoute>
           }
