@@ -45,3 +45,31 @@ class Disponibilidad(models.Model):
 
     def __str__(self):
         return f"Disponibilidad {self.experiencia.titulo} - {self.fecha}"
+
+
+class Reserva(models.Model):
+    """Solicitud de reserva/adquisicion de una experiencia por parte de un cliente."""
+
+    ESTADOS = [
+        ('pendiente', 'Pendiente'),
+        ('confirmada', 'Confirmada'),
+        ('cancelada', 'Cancelada'),
+    ]
+
+    experiencia = models.ForeignKey(Experiencia, related_name='reservas', on_delete=models.CASCADE)
+    cliente = models.ForeignKey(settings.AUTH_USER_MODEL, related_name='reservas', on_delete=models.CASCADE)
+    disponibilidad = models.ForeignKey(
+        Disponibilidad, related_name='reservas', on_delete=models.SET_NULL, null=True, blank=True
+    )
+    fecha = models.DateField()
+    personas = models.PositiveIntegerField(default=1)
+    precio_total = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    estado = models.CharField(max_length=20, choices=ESTADOS, default='pendiente')
+    notas = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Reserva {self.experiencia.titulo} - {self.cliente} ({self.fecha})"
