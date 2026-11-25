@@ -9,6 +9,7 @@ const LoginPage = lazy(() => import('./pages/LoginPage.jsx'))
 const RegistroPage = lazy(() => import('./pages/RegistroPage.jsx'))
 const ExperienciasPage = lazy(() => import('./pages/ExperienciasPage.jsx'))
 const ExperienciaDetallePage = lazy(() => import('./pages/ExperienciaDetallePage.jsx'))
+const MisReservasPage = lazy(() => import('./pages/MisReservasPage.jsx'))
 const AdminPage = lazy(() => import('./pages/AdminPage.jsx'))
 
 export default function App() {
@@ -31,6 +32,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <ExperienciaDetallePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/mis-reservas"
+          element={
+            <ProtectedRoute>
+              <MisReservasPage />
             </ProtectedRoute>
           }
         />

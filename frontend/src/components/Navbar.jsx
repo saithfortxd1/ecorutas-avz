@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom'
-import { Compass, LayoutGrid, Leaf, Map as MapIcon, RefreshCw, Route as RouteIcon, ShieldCheck, Users } from 'lucide-react'
+import { Compass, LayoutGrid, Leaf, Map as MapIcon, RefreshCw, Route as RouteIcon, ShieldCheck, Ticket, Users } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '../context/AuthContext.jsx'
 import { fullName } from '../models/Usuario.js'
@@ -76,6 +76,15 @@ export default function Navbar({ onNew }) {
                 {item.nombre}
               </Link>
             ))}
+            <Link
+              to="/mis-reservas"
+              onMouseEnter={() => prefetchRoute('/mis-reservas').catch(() => {})}
+              onFocus={() => prefetchRoute('/mis-reservas').catch(() => {})}
+              className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-white/90 transition hover:bg-white/15 hover:text-white"
+            >
+              <Ticket size={16} strokeWidth={1.8} aria-hidden="true" />
+              Mis reservas
+            </Link>
           </nav>
           <div className="hidden text-right sm:block">
             <p className="text-sm font-semibold leading-tight">{fullName(user)}</p>
