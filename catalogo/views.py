@@ -2,18 +2,19 @@ from rest_framework import viewsets
 from rest_framework.filters import SearchFilter, OrderingFilter
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import PermissionDenied
-from django.db.models import Prefetch
+from django.db.models import Prefetch, Q
 
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 
 from usuarios.permissions import HasResourcePermission, IsAnfitrion, IsOwnerOrReadOnly, IsAdminOrReadOnly
 
-from .models import Categoria, Experiencia, Disponibilidad, ExperienciaTraduccion, FotoExperiencia
+from .models import Categoria, Experiencia, Disponibilidad, ExperienciaTraduccion, FotoExperiencia, Reserva
 from .serializers import (
     CategoriaSerializer,
     ExperienciaSerializer,
     DisponibilidadSerializer,
+    ReservaSerializer,
 )
 
 
@@ -146,6 +147,13 @@ class DisponibilidadViewSet(viewsets.ModelViewSet):
     )
     serializer_class = DisponibilidadSerializer
 
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        experiencia_id = self.request.query_params.get('experiencia')
+        if experiencia_id:
+            queryset = queryset.filter(experiencia_id=experiencia_id)
+        return queryset
+
     def get_permissions(self):
         self.requires_resource_permission = True
         if self.action in ('list', 'retrieve'):
@@ -212,3 +220,58 @@ class DisponibilidadViewSet(viewsets.ModelViewSet):
     )
     def destroy(self, request, *args, **kwargs):
         return super().destroy(request, *args, **kwargs)
+
+
+class ReservaViewSet(viewsets.ModelViewSet):
+    """
+    Reservas/solicitudes de experiencias por parte de clientes (turistas).
+
+    - Crear: cualquier usuario autenticado; el cliente se asigna automaticamente.
+    - Listar: el cliente ve las suyas; el anfitrion las de sus experiencias; el Administrador todas.
+    - Eliminar: solo el cliente propietario (o Administrador).
+    """
+    serializer_class = ReservaSerializer
+    permission_classes = [IsAuthenticated]
+
+    def es_admin(self, user):
+        return bool(user.is_superuser or user.roles.filter(nombre='Administrador').exists())
+
+    def get_queryset(self):
+        user = self.request.user
+        qs = Reserva.objects.select_related('experiencia', 'cliente', 'disponibilidad')
+        if self.es_admin(user):
+            return qs
+        if getattr(user, 'rol', None) == 'anfitrion':
+            return qs.filter(Q(cliente=user) | Q(experiencia__anfitrion=user))
+        return qs.filter(cliente=user)
+
+    def perform_create(self, serializer):
+        experiencia = serializer.validated_data['experiencia']
+        personas = serializer.validated_data.get('personas', 1)
+        serializer.save(
+            cliente=self.request.user,
+            precio_total=experiencia.precio_unitario * personas,
+        )
+
+    def perform_destroy(self, instance):
+        user = self.request.user
+        if instance.cliente_id != user.id and not self.es_admin(user):
+            raise PermissionDenied('Solo puedes cancelar tus propias reservas.')
+        instance.delete()
+
+    @swagger_auto_schema(
+        operation_summary='Listar reservas',
+        operation_description='El cliente ve sus reservas; el anfitrion las de sus experiencias.',
+        responses={200: ReservaSerializer(many=True)},
+    )
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
+
+    @swagger_auto_schema(
+        operation_summary='Crear reserva',
+        operation_description='Cualquier usuario autenticado puede reservar una experiencia.',
+        request_body=ReservaSerializer,
+        responses={201: ReservaSerializer},
+    )
+    def create(self, request, *args, **kwargs):
+        return super().create(request, *args, **kwargs)
