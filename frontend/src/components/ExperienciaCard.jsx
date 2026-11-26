@@ -6,7 +6,7 @@ import { getExperienceImageInfo, getExperienceImageSrcSet } from '../utils/exper
 import { formatCurrencyCOP } from '../utils/formatters.js'
 
 export default function ExperienciaCard({ experiencia, canManage, onEdit, onDelete, index = 0 }) {
-  const { titulo, descripcion, precioTexto, estado, categoriaNombre, anfitrionUsername } = experiencia
+  const { titulo, descripcion, precioTexto, estado, categoriaNombre, anfitrionUsername, incluye } = experiencia
   const imageInfo = getExperienceImageInfo(experiencia)
   const [image, setImage] = useState(() => imageInfo.url)
   const reduceMotion = useReducedMotion()
@@ -46,11 +46,12 @@ export default function ExperienciaCard({ experiencia, canManage, onEdit, onDele
       <div className="flex flex-1 flex-col p-5 sm:p-5">
         <h2 className="line-clamp-2 min-h-[3.5rem] font-display text-[1.3rem] leading-7 text-eco-950">{titulo}</h2>
         <p className="mt-2 line-clamp-2 min-h-10 text-sm leading-5 text-stone-600">{descripcion}</p>
+        {incluye && <p className="mt-2 line-clamp-1 text-xs text-stone-500"><strong className="text-stone-700">Incluye:</strong> {incluye.replace(/\n/g, ', ')}</p>}
 
         <div className="mt-4 flex min-h-5 items-center gap-1.5 text-xs text-stone-500">
           {position && <><MapPin size={14} className="shrink-0 text-eco-700" aria-hidden="true" /><span>Coordenadas {position}</span></>}
         </div>
-        {anfitrionUsername && <p className="mt-2 flex items-center gap-1.5 text-xs font-medium text-eco-800"><UserRound size={14} aria-hidden="true" />Anfitrión @{anfitrionUsername}</p>}
+        {anfitrionUsername && <p className="mt-2 flex items-center gap-1.5 text-xs font-medium text-eco-800"><UserRound size={14} aria-hidden="true" />{experiencia.anfitrionNombre} · @{anfitrionUsername}</p>}
 
         <div className="mt-auto flex items-end justify-between gap-3 border-t border-stone-100 pt-4">
           <p className="leading-tight text-stone-500"><span className="block text-[0.65rem] font-semibold uppercase tracking-[0.14em]">Precio</span><strong className="mt-1 inline-block text-xl font-bold text-eco-900">{formatCurrencyCOP(experiencia.precio ?? precioTexto)}</strong></p>

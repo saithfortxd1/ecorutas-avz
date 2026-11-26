@@ -3,8 +3,9 @@ import { Link, useParams } from 'react-router-dom'
 import { CalendarDays, CheckCircle2, Leaf, MapPin, Trash2, UserRound, Users } from 'lucide-react'
 import Navbar from '../components/Navbar.jsx'
 import FullScreenLoader from '../components/FullScreenLoader.jsx'
+import { useAuth } from '../context/AuthContext.jsx'
 import { getExperiencia, listDisponibilidades } from '../services/experienciaService.js'
-import { crearReserva, listarMisReservas, cancelarReserva } from '../services/reservaService.js'
+import { actualizarEstado, crearReserva, listarMisReservas } from '../services/reservaService.js'
 import { formatCurrencyCOP } from '../utils/formatters.js'
 import { getExperienceImageInfo } from '../utils/experienceImages.js'
 import { extractErrorMessage } from '../utils/errors.js'
@@ -13,6 +14,7 @@ const HOY = new Date().toISOString().slice(0, 10)
 
 export default function ExperienciaDetallePage() {
   const { id } = useParams()
+  const { user } = useAuth()
 
   const [experiencia, setExperiencia] = useState(null)
   const [disponibilidades, setDisponibilidades] = useState([])
@@ -23,6 +25,7 @@ export default function ExperienciaDetallePage() {
   const [fecha, setFecha] = useState(HOY)
   const [personas, setPersonas] = useState(1)
   const [disponibilidadId, setDisponibilidadId] = useState('')
+  const [telefonoContacto, setTelefonoContacto] = useState(user?.telefono ?? '')
   const [notas, setNotas] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState('')
@@ -31,8 +34,8 @@ export default function ExperienciaDetallePage() {
   const cargarReservas = useCallback(async () => {
     try {
       setReservas(await listarMisReservas())
-    } catch {
-      setReservas([])
+    } catch (err) {
+      setFormError(extractErrorMessage(err, 'No se pudieron actualizar tus reservas.'))
     }
   }, [])
 
@@ -58,6 +61,11 @@ export default function ExperienciaDetallePage() {
     }
   }, [id, cargarReservas])
 
+  useEffect(() => {
+    const intervalo = window.setInterval(() => { void cargarReservas() }, 10000)
+    return () => window.clearInterval(intervalo)
+  }, [cargarReservas])
+
   const misReservasDelPlan = useMemo(
     () => reservas.filter((r) => String(r.experienciaId) === String(id)),
     [reservas, id],
@@ -67,6 +75,11 @@ export default function ExperienciaDetallePage() {
     () => (experiencia ? experiencia.precio * (Number(personas) || 1) : 0),
     [experiencia, personas],
   )
+  const disponibilidadSeleccionada = disponibilidades.find((d) => String(d.id) === String(disponibilidadId))
+
+  useEffect(() => {
+    if (!telefonoContacto && user?.telefono) setTelefonoContacto(user.telefono)
+  }, [telefonoContacto, user?.telefono])
 
   const handleDisponibilidad = (value) => {
     setDisponibilidadId(value)
@@ -87,6 +100,10 @@ export default function ExperienciaDetallePage() {
       setFormError('Indica al menos 1 persona.')
       return
     }
+    if (disponibilidadSeleccionada && Number(personas) > disponibilidadSeleccionada.cuposDisponibles) {
+      setFormError(`Solo quedan ${disponibilidadSeleccionada.cuposDisponibles} cupos para esa fecha.`)
+      return
+    }
 
     setSubmitting(true)
     try {
@@ -95,6 +112,7 @@ export default function ExperienciaDetallePage() {
         disponibilidadId: disponibilidadId || null,
         fecha,
         personas: Number(personas),
+        telefonoContacto,
         notas,
       })
       setSuccess(reserva)
@@ -112,8 +130,8 @@ export default function ExperienciaDetallePage() {
   const handleCancelar = async (reserva) => {
     if (!window.confirm(`¿Cancelar la reserva del ${reserva.fecha}?`)) return
     try {
-      await cancelarReserva(reserva.id)
-      await cargarReservas()
+      const actualizada = await actualizarEstado(reserva.id, 'cancelada')
+      setReservas((items) => items.map((item) => item.id === actualizada.id ? actualizada : item))
     } catch (err) {
       setFormError(extractErrorMessage(err, 'No se pudo cancelar la reserva.'))
     }
@@ -159,12 +177,29 @@ export default function ExperienciaDetallePage() {
               <p className="mt-3 whitespace-pre-line text-sm leading-6 text-stone-600">{experiencia.descripcion}</p>
 
               <dl className="mt-6 flex flex-wrap gap-x-8 gap-y-3 text-sm text-stone-600">
-                <div className="flex items-center gap-2"><MapPin size={16} className="text-eco-700" aria-hidden="true" />{experiencia.latitud.toFixed(4)}, {experiencia.longitud.toFixed(4)}</div>
-                {experiencia.anfitrionUsername && <div className="flex items-center gap-2"><UserRound size={16} className="text-eco-700" aria-hidden="true" />Anfitrión @{experiencia.anfitrionUsername}</div>}
+                <a href={`https://www.google.com/maps?q=${experiencia.latitud},${experiencia.longitud}`} target="_blank" rel="noreferrer noopener" className="flex items-center gap-2 hover:text-eco-800">
+                  <MapPin size={16} className="text-eco-700" aria-hidden="true" />{experiencia.latitud.toFixed(4)}, {experiencia.longitud.toFixed(4)} · Ver mapa
+                </a>
+                {experiencia.anfitrionUsername && <div className="flex items-center gap-2"><UserRound size={16} className="text-eco-700" aria-hidden="true" />{experiencia.anfitrionNombre} · @{experiencia.anfitrionUsername}</div>}
                 <div className="flex items-center gap-2"><Users size={16} className="text-eco-700" aria-hidden="true" />{experiencia.estado}</div>
               </dl>
 
               <p className="mt-6 text-3xl font-bold text-eco-900">{formatCurrencyCOP(experiencia.precio)} <span className="text-sm font-medium text-stone-500">/ persona</span></p>
+
+              <div className="mt-8 grid gap-4 sm:grid-cols-2">
+                <section className="rounded-2xl bg-[#f7f8f2] p-5">
+                  <h2 className="text-sm font-bold uppercase tracking-wide text-eco-900">Qué incluye</h2>
+                  {experiencia.incluye ? (
+                    <ul className="mt-3 list-disc space-y-1.5 pl-5 text-sm leading-5 text-stone-600">
+                      {experiencia.incluye.split(/\r?\n/).filter(Boolean).map((item, index) => <li key={`${index}-${item}`}>{item}</li>)}
+                    </ul>
+                  ) : <p className="mt-3 text-sm text-stone-500">Consulta los detalles incluidos con el anfitrión.</p>}
+                </section>
+                <section className="rounded-2xl bg-[#fbf6eb] p-5">
+                  <h2 className="text-sm font-bold uppercase tracking-wide text-stone-800">Recomendaciones y condiciones</h2>
+                  <p className="mt-3 whitespace-pre-line text-sm leading-5 text-stone-600">{experiencia.recomendaciones || 'Confirma con el anfitrión las condiciones locales y qué llevar antes de tu visita.'}</p>
+                </section>
+              </div>
 
               {disponibilidades.length > 0 && (
                 <section className="mt-8">
@@ -172,7 +207,7 @@ export default function ExperienciaDetallePage() {
                   <ul className="mt-3 grid gap-2 sm:grid-cols-2">
                     {disponibilidades.map((d) => (
                       <li key={d.id} className="rounded-xl border border-stone-200 bg-[#fbfaf6] px-4 py-3 text-sm text-stone-700">
-                        <strong className="text-eco-900">{d.fecha}</strong> · {d.horaInicio}–{d.horaFin} · {d.cuposTotales} cupos
+                        <strong className="text-eco-900">{d.fecha}</strong> · {d.horaInicio}–{d.horaFin} · {d.cuposDisponibles} de {d.cuposTotales} cupos disponibles
                       </li>
                     ))}
                   </ul>
@@ -199,7 +234,7 @@ export default function ExperienciaDetallePage() {
             {success && (
               <div className="mt-4 flex items-start gap-2 rounded-xl border border-eco-200 bg-eco-50 px-4 py-3 text-sm text-eco-800">
                 <CheckCircle2 size={18} className="mt-0.5 shrink-0" aria-hidden="true" />
-                <span>Reserva registrada (estado: {success.estado}). Total {formatCurrencyCOP(success.precioTotal)} para {success.personas} persona(s).</span>
+                <span>Reserva registrada (estado: {success.estado}). {formatCurrencyCOP(experiencia.precio)} por persona × {success.personas} = {formatCurrencyCOP(success.precioTotal)}.</span>
               </div>
             )}
             {formError && <p role="alert" className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{formError}</p>}
@@ -211,7 +246,7 @@ export default function ExperienciaDetallePage() {
                   <select value={disponibilidadId} onChange={(e) => handleDisponibilidad(e.target.value)} className={inputClass}>
                     <option value="">Elegir fecha manualmente</option>
                     {disponibilidades.map((d) => (
-                      <option key={d.id} value={d.id}>{d.fecha} ({d.cuposTotales} cupos)</option>
+                      <option key={d.id} value={d.id} disabled={d.cuposDisponibles === 0}>{d.fecha} ({d.cuposDisponibles} cupos disponibles)</option>
                     ))}
                   </select>
                 </label>
@@ -224,7 +259,12 @@ export default function ExperienciaDetallePage() {
 
               <label className="block text-xs font-bold text-stone-600">
                 Personas
-                <input type="number" min="1" step="1" value={personas} onChange={(e) => setPersonas(e.target.value)} required className={inputClass} />
+                <input type="number" min="1" max={disponibilidadSeleccionada?.cuposDisponibles || undefined} step="1" value={personas} onChange={(e) => setPersonas(e.target.value)} required className={inputClass} />
+              </label>
+
+              <label className="block text-xs font-bold text-stone-600">
+                Teléfono de contacto (opcional)
+                <input type="tel" value={telefonoContacto} onChange={(e) => setTelefonoContacto(e.target.value)} className={inputClass} placeholder="Tu teléfono" />
               </label>
 
               <label className="block text-xs font-bold text-stone-600">
@@ -232,9 +272,12 @@ export default function ExperienciaDetallePage() {
                 <textarea rows="3" value={notas} onChange={(e) => setNotas(e.target.value)} className={inputClass} placeholder="Preferencias, llegada, etc." />
               </label>
 
-              <div className="flex items-center justify-between rounded-xl bg-[#fbfaf6] px-4 py-3 text-sm">
-                <span className="text-stone-500">Total estimado</span>
-                <strong className="text-lg text-eco-900">{formatCurrencyCOP(precioTotal)}</strong>
+              <div className="rounded-xl bg-[#fbfaf6] px-4 py-3 text-sm">
+                <div className="flex items-center justify-between gap-3 text-stone-600">
+                  <span>{formatCurrencyCOP(experiencia.precio)} por persona × {Number(personas) || 1}</span>
+                  <strong className="text-lg text-eco-900">{formatCurrencyCOP(precioTotal)}</strong>
+                </div>
+                <p className="mt-1 text-right text-xs text-stone-500">Total estimado antes de confirmar la reserva</p>
               </div>
 
               <button type="submit" disabled={submitting} className="w-full rounded-xl bg-eco-800 px-4 py-3 text-sm font-bold text-white transition hover:bg-eco-900 disabled:opacity-60">
@@ -250,9 +293,11 @@ export default function ExperienciaDetallePage() {
                   {misReservasDelPlan.map((r) => (
                     <li key={r.id} className="flex items-center justify-between gap-3 rounded-xl border border-stone-200 bg-[#fbfaf6] px-4 py-3 text-sm">
                       <span className="text-stone-700">{r.fecha} · {r.personas} pers. · <em className="not-italic font-semibold text-eco-800">{r.estado}</em></span>
-                      <button type="button" onClick={() => handleCancelar(r)} aria-label="Cancelar reserva" className="inline-flex items-center gap-1 rounded-lg border border-red-100 px-2.5 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50">
-                        <Trash2 size={13} />Cancelar
-                      </button>
+                      {(r.estado === 'pendiente' || r.estado === 'confirmada') && (
+                        <button type="button" onClick={() => handleCancelar(r)} aria-label="Cancelar reserva" className="inline-flex items-center gap-1 rounded-lg border border-red-100 px-2.5 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50">
+                          <Trash2 size={13} />Cancelar
+                        </button>
+                      )}
                     </li>
                   ))}
                 </ul>
