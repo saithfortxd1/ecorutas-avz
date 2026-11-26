@@ -23,6 +23,9 @@ export function normalizeExperiencia(raw) {
     categoriaNombre: raw.categoria_nombre ?? 'Sin categoría',
     anfitrionId: raw.anfitrion ?? null,
     anfitrionUsername: raw.anfitrion_username ?? null,
+    anfitrionNombre: raw.anfitrion_nombre ?? raw.anfitrion_username ?? null,
+    incluye: raw.incluye ?? '',
+    recomendaciones: raw.recomendaciones ?? '',
     createdAt: raw.created_at ?? null,
     traducciones: Array.isArray(raw.traducciones) ? raw.traducciones : [],
     fotos: Array.isArray(raw.fotos) ? raw.fotos : [],
@@ -39,6 +42,8 @@ export function experienciaToPayload(form) {
     longitud: String(form.longitud ?? ''),
     estado: form.estado || 'Activa',
     categoria: form.categoriaId != null && form.categoriaId !== '' ? Number(form.categoriaId) : null,
+    incluye: String(form.incluye ?? '').trim(),
+    recomendaciones: String(form.recomendaciones ?? '').trim(),
   }
 }
 

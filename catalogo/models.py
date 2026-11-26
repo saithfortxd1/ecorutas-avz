@@ -16,6 +16,8 @@ class Experiencia(models.Model):
     latitud = models.DecimalField(max_digits=9, decimal_places=6)
     longitud = models.DecimalField(max_digits=9, decimal_places=6)
     estado = models.CharField(max_length=20, default='Activa')
+    incluye = models.TextField(blank=True, help_text='Que incluye el plan (una linea por item).')
+    recomendaciones = models.TextField(blank=True, help_text='Recomendaciones y condiciones del plan.')
     created_at = models.DateTimeField(auto_now_add=True)
     deleted_at = models.DateTimeField(null=True, blank=True)
 
@@ -53,6 +55,7 @@ class Reserva(models.Model):
     ESTADOS = [
         ('pendiente', 'Pendiente'),
         ('confirmada', 'Confirmada'),
+        ('completada', 'Completada'),
         ('cancelada', 'Cancelada'),
     ]
 
@@ -65,6 +68,7 @@ class Reserva(models.Model):
     personas = models.PositiveIntegerField(default=1)
     precio_total = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     estado = models.CharField(max_length=20, choices=ESTADOS, default='pendiente')
+    telefono_contacto = models.CharField(max_length=30, blank=True)
     notas = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 

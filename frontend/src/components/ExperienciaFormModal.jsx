@@ -8,6 +8,8 @@ const EMPTY = {
   latitud: '',
   longitud: '',
   estado: 'Activa',
+  incluye: '',
+  recomendaciones: '',
 }
 
 /**
@@ -30,6 +32,8 @@ export default function ExperienciaFormModal({ open, onClose, onSubmit, initial,
         latitud: initial.latitud ?? '',
         longitud: initial.longitud ?? '',
         estado: initial.estado ?? 'Activa',
+        incluye: initial.incluye ?? '',
+        recomendaciones: initial.recomendaciones ?? '',
       })
     } else {
       setForm(EMPTY)
@@ -64,6 +68,8 @@ export default function ExperienciaFormModal({ open, onClose, onSubmit, initial,
       longitud: String(form.longitud),
       estado: form.estado,
       categoriaId: form.categoriaId ? Number(form.categoriaId) : null,
+      incluye: form.incluye.trim(),
+      recomendaciones: form.recomendaciones.trim(),
     })
   }
 
@@ -95,6 +101,22 @@ export default function ExperienciaFormModal({ open, onClose, onSubmit, initial,
             <textarea
               id="descripcion" name="descripcion" rows="3" value={form.descripcion}
               onChange={handleChange} className={inputClass}
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-semibold text-slate-700" htmlFor="incluye">Qué incluye</label>
+            <textarea
+              id="incluye" name="incluye" rows="2" value={form.incluye}
+              onChange={handleChange} className={inputClass} placeholder="Una actividad o servicio por línea"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-semibold text-slate-700" htmlFor="recomendaciones">Recomendaciones y condiciones</label>
+            <textarea
+              id="recomendaciones" name="recomendaciones" rows="2" value={form.recomendaciones}
+              onChange={handleChange} className={inputClass} placeholder="Qué llevar, restricciones o condiciones locales"
             />
           </div>
 
