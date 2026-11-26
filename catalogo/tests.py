@@ -34,7 +34,8 @@ class FlujoClienteReservasTest(APITestCase):
             username='host_flujo', email='host@test.com', password='Clave12345'
         )
         self.cliente = Usuario.objects.create_user(
-            username='cliente_flujo', email='cliente@test.com', password='Clave12345'
+            username='cliente_flujo', email='cliente@test.com', password='Clave12345',
+            first_name='Lina', last_name='Turista', telefono='3001234567',
         )
         self.cliente.roles.set([self.rol_turista])
         self.otro_cliente = Usuario.objects.create_user(
@@ -52,6 +53,8 @@ class FlujoClienteReservasTest(APITestCase):
             latitud=Decimal('11.544444'),
             longitud=Decimal('-72.907222'),
             estado='Activa',
+            incluye='Guía local\nParadas fotográficas',
+            recomendaciones='Lleva agua y calzado cómodo.',
         )
         self.disponibilidad = Disponibilidad.objects.create(
             experiencia=self.experiencia,
@@ -67,6 +70,7 @@ class FlujoClienteReservasTest(APITestCase):
             'disponibilidad': self.disponibilidad.id,
             'fecha': '2026-12-20',
             'personas': 2,
+            'telefono_contacto': '3019876543',
             'notas': 'Llegada temprano',
         }
         payload.update(overrides)
@@ -83,6 +87,8 @@ class FlujoClienteReservasTest(APITestCase):
         response = self.client.get(f'/api/catalogo/experiencias/{self.experiencia.id}/')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()['titulo'], 'Ruta de prueba')
+        self.assertEqual(response.json()['incluye'], 'Guía local\nParadas fotográficas')
+        self.assertEqual(response.json()['recomendaciones'], 'Lleva agua y calzado cómodo.')
 
     def test_turista_crea_reserva_y_calcula_total(self):
         self.client.force_authenticate(user=self.cliente)
@@ -92,6 +98,11 @@ class FlujoClienteReservasTest(APITestCase):
         self.assertEqual(data['cliente'], self.cliente.id)
         self.assertEqual(data['estado'], 'pendiente')
         self.assertEqual(Decimal(data['precio_total']), Decimal('100000.00'))
+        self.assertEqual(data['experiencia_titulo'], self.experiencia.titulo)
+        self.assertEqual(data['cliente_nombre'], 'Lina Turista')
+        self.assertEqual(data['cliente_email'], self.cliente.email)
+        self.assertEqual(data['cliente_telefono'], self.cliente.telefono)
+        self.assertEqual(data['telefono_contacto'], '3019876543')
         self.assertEqual(Reserva.objects.filter(cliente=self.cliente).count(), 1)
 
     def test_reserva_ignora_cliente_enviado(self):
@@ -114,6 +125,30 @@ class FlujoClienteReservasTest(APITestCase):
         self.client.force_authenticate(user=self.cliente)
         response = self.client.post('/api/catalogo/reservas/', self._reserva_payload(personas=99), format='json')
         self.assertEqual(response.status_code, 400)
+
+    def test_disponibilidad_muestra_cupos_restantes_y_los_libera_al_cancelar(self):
+        self.client.force_authenticate(user=self.cliente)
+        creada = self.client.post('/api/catalogo/reservas/', self._reserva_payload(), format='json')
+        self.assertEqual(creada.status_code, 201, msg=creada.content)
+
+        disponibilidad = self.client.get(
+            '/api/catalogo/disponibilidades/',
+            {'experiencia': self.experiencia.id},
+        )
+        self.assertEqual(disponibilidad.status_code, 200)
+        self.assertEqual(disponibilidad.json()[0]['cupos_disponibles'], 8)
+
+        cancelada = self.client.patch(
+            f"/api/catalogo/reservas/{creada.json()['id']}/",
+            {'estado': 'cancelada'},
+            format='json',
+        )
+        self.assertEqual(cancelada.status_code, 200, msg=cancelada.content)
+        disponibilidad = self.client.get(
+            '/api/catalogo/disponibilidades/',
+            {'experiencia': self.experiencia.id},
+        )
+        self.assertEqual(disponibilidad.json()[0]['cupos_disponibles'], 10)
 
     def test_turista_solo_ve_sus_reservas(self):
         mis = Reserva.objects.create(
@@ -149,3 +184,128 @@ class FlujoClienteReservasTest(APITestCase):
         self.client.force_authenticate(user=self.cliente)
         response = self.client.get(f'/api/catalogo/reservas/{ajena.id}/')
         self.assertEqual(response.status_code, 404)
+
+    def test_anfitrion_y_administrador_gestionan_reserva_y_turista_ve_estado(self):
+        rol_anfitrion, _ = Rol.objects.get_or_create(nombre='Anfitrión')
+        rol_admin, _ = Rol.objects.get_or_create(nombre='Administrador')
+        self.anfitrion.roles.add(rol_anfitrion)
+        self.disponibilidad.cupos_totales = 2
+        self.disponibilidad.save(update_fields=['cupos_totales'])
+        administrador = Usuario.objects.create_user(
+            username='admin_reservas', email='admin@test.com', password='Clave12345',
+        )
+        administrador.roles.add(rol_admin)
+        reserva = Reserva.objects.create(
+            experiencia=self.experiencia,
+            cliente=self.cliente,
+            disponibilidad=self.disponibilidad,
+            fecha=date(2026, 12, 20),
+            personas=2,
+            precio_total=Decimal('100000.00'),
+            notas='Llegada temprano',
+        )
+
+        self.client.force_authenticate(user=self.anfitrion)
+        recibidas = self.client.get('/api/catalogo/reservas/')
+        self.assertEqual(recibidas.status_code, 200)
+        self.assertEqual([item['id'] for item in recibidas.json()], [reserva.id])
+        self.assertEqual(recibidas.json()[0]['cliente_email'], self.cliente.email)
+        confirmada = self.client.patch(
+            f'/api/catalogo/reservas/{reserva.id}/',
+            {'estado': 'confirmada', 'notas': 'Encuentro confirmado a las 8:00'},
+            format='json',
+        )
+        self.assertEqual(confirmada.status_code, 200, msg=confirmada.content)
+        self.assertEqual(confirmada.json()['estado'], 'confirmada')
+
+        self.client.force_authenticate(user=administrador)
+        visibles_admin = self.client.get('/api/catalogo/reservas/')
+        self.assertEqual(visibles_admin.status_code, 200)
+        self.assertEqual([item['id'] for item in visibles_admin.json()], [reserva.id])
+        completada = self.client.patch(
+            f'/api/catalogo/reservas/{reserva.id}/',
+            {'estado': 'completada'},
+            format='json',
+        )
+        self.assertEqual(completada.status_code, 200, msg=completada.content)
+        self.assertEqual(completada.json()['estado'], 'completada')
+
+        self.client.force_authenticate(user=self.cliente)
+        propia = self.client.get('/api/catalogo/reservas/')
+        self.assertEqual(propia.status_code, 200)
+        self.assertEqual(propia.json()[0]['estado'], 'completada')
+        self.assertEqual(propia.json()[0]['notas'], 'Encuentro confirmado a las 8:00')
+
+    def test_turista_solo_puede_cancelar_su_reserva_y_no_accede_a_admin(self):
+        reserva = Reserva.objects.create(
+            experiencia=self.experiencia,
+            cliente=self.cliente,
+            disponibilidad=self.disponibilidad,
+            fecha=date(2026, 12, 20),
+            personas=1,
+            precio_total=Decimal('50000.00'),
+        )
+        self.client.force_authenticate(user=self.cliente)
+        cancelada = self.client.patch(
+            f'/api/catalogo/reservas/{reserva.id}/',
+            {'estado': 'cancelada'},
+            format='json',
+        )
+        self.assertEqual(cancelada.status_code, 200, msg=cancelada.content)
+        self.assertEqual(cancelada.json()['estado'], 'cancelada')
+
+        admin_response = self.client.get('/api/usuarios/admin/')
+        self.assertEqual(admin_response.status_code, 403)
+        self.assertIn('detail', admin_response.json())
+
+    def test_turista_no_puede_editar_notas_de_reserva(self):
+        reserva = Reserva.objects.create(
+            experiencia=self.experiencia,
+            cliente=self.cliente,
+            disponibilidad=self.disponibilidad,
+            fecha=date(2026, 12, 20),
+            personas=1,
+            precio_total=Decimal('50000.00'),
+        )
+        self.client.force_authenticate(user=self.cliente)
+        response = self.client.patch(
+            f'/api/catalogo/reservas/{reserva.id}/',
+            {'notas': 'cambio no autorizado'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, 403)
+        reserva.refresh_from_db()
+        self.assertEqual(reserva.notas, '')
+
+    def test_anfitrion_no_ve_reservas_de_experiencias_ajenas(self):
+        otro_anfitrion = Usuario.objects.create_user(
+            username='otro_host_flujo', email='otro-host@test.com', password='Clave12345',
+        )
+        otra_experiencia = Experiencia.objects.create(
+            anfitrion=otro_anfitrion,
+            categoria=self.categoria,
+            titulo='Otra ruta de prueba',
+            descripcion='Plan de otro anfitrion.',
+            precio_unitario=Decimal('30000.00'),
+            latitud=Decimal('11.500000'),
+            longitud=Decimal('-72.900000'),
+        )
+        reserva_ajena = Reserva.objects.create(
+            experiencia=otra_experiencia,
+            cliente=self.cliente,
+            fecha=date(2026, 12, 20),
+            personas=1,
+            precio_total=Decimal('30000.00'),
+        )
+        rol_anfitrion, _ = Rol.objects.get_or_create(nombre='Anfitrión')
+        self.anfitrion.roles.add(rol_anfitrion)
+        self.client.force_authenticate(user=self.anfitrion)
+        self.assertEqual(self.client.get('/api/catalogo/reservas/').json(), [])
+        self.assertEqual(
+            self.client.patch(
+                f'/api/catalogo/reservas/{reserva_ajena.id}/',
+                {'estado': 'confirmada'},
+                format='json',
+            ).status_code,
+            404,
+        )

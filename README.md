@@ -174,7 +174,13 @@ python manage.py seed_db --reemplazar-experiencias
 
 El comando carga 100 variantes de demostración permutando actividades en destinos colombianos de La Guajira, la Sierra Nevada, Tayrona, el Eje Cafetero, el Pacífico, la Amazonía y otras regiones. Los precios se guardan como valores decimales enteros en COP y las interfaces los presentan con formato colombiano. Estos registros de seeding no certifican por sí solos disponibilidad ni ofertas de operadores turísticos.
 
-`--reemplazar-experiencias` elimina las experiencias existentes y sus fotos, traducciones y disponibilidades relacionadas antes de insertar las 100 variantes. No elimina usuarios, roles ni categorías; puede crear categorías base que aún no existan. Por defecto no genera lotes de usuarios de prueba ni disponibilidades. Si no hay ningún usuario con rol Anfitrión, crea la cuenta local de respaldo `anfitrion_test` con contraseña `testpass123`, que debe cambiarse o eliminarse de inmediato. El comando está protegido cuando `DEBUG=False`; no lo ejecutes contra datos de producción. La opción `--clean` tiene un alcance más amplio y además elimina categorías y usuarios que no sean superusuarios.
+`--reemplazar-experiencias` elimina las experiencias existentes y sus fotos, traducciones y disponibilidades relacionadas antes de insertar las 100 variantes. No elimina usuarios, roles ni categorías; puede crear categorías base que aún no existan. Por defecto no genera lotes de usuarios de prueba ni disponibilidades. Los planes se asignan a `anfitrion_demo`; usa el comando local siguiente para asignar contraseña a las cuentas de prueba y completar los datos comerciales:
+
+```bash
+python manage.py preparar_demo --password "elige-una-clave-local"
+```
+
+El comando `preparar_demo` requiere `DEBUG=True`, crea `anfitrion_demo` y `turista_demo`, asigna las experiencias actuales al anfitrión de demo, rellena información comercial vacía y agrega una fecha futura con cupos a los planes sin disponibilidad. No uses cuentas ni contraseñas de demostración en producción. La opción `--clean` tiene un alcance más amplio y además elimina categorías y usuarios que no sean superusuarios.
 
 ## Endpoints principales
 
@@ -196,6 +202,8 @@ Todas las rutas de la tabla están bajo `/api`:
 | `/catalogo/categorias/` | Consultar y administrar categorías según permisos |
 | `/catalogo/experiencias/` | Consultar y administrar experiencias; admite `?search=` y `?ordering=` |
 | `/catalogo/disponibilidades/` | Consultar y administrar disponibilidades según permisos |
+| `/catalogo/reservas/` | Crear y consultar reservas; anfitriones propietarios y administradores pueden gestionarlas |
+| `/catalogo/reservas/{id}/` | Consultar, actualizar estado/notas con `PATCH` o cancelar |
 
 Los endpoints administrativos requieren JWT y el permiso asociado al recurso. Las operaciones de escritura también aplican sus reglas de rol y propiedad.
 

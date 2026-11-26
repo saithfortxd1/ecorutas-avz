@@ -1,8 +1,9 @@
 from rest_framework import viewsets
 from rest_framework.filters import SearchFilter, OrderingFilter
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.exceptions import PermissionDenied
-from django.db.models import Prefetch, Q
+from rest_framework.response import Response
+from rest_framework.exceptions import PermissionDenied, ValidationError
+from django.db.models import Prefetch, Q, Sum
 
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
@@ -144,6 +145,11 @@ class DisponibilidadViewSet(viewsets.ModelViewSet):
     """
     queryset = Disponibilidad.objects.select_related(
         'experiencia', 'experiencia__anfitrion'
+    ).annotate(
+        reservas_activas=Sum(
+            'reservas__personas',
+            filter=Q(reservas__estado__in=('pendiente', 'confirmada')),
+        ),
     )
     serializer_class = DisponibilidadSerializer
 
@@ -236,12 +242,18 @@ class ReservaViewSet(viewsets.ModelViewSet):
     def es_admin(self, user):
         return bool(user.is_superuser or user.roles.filter(nombre='Administrador').exists())
 
+    def es_anfitrion(self, user):
+        return bool(
+            user.estado_verificacion != 'rechazado'
+            and user.roles.filter(nombre='Anfitrión').exists()
+        )
+
     def get_queryset(self):
         user = self.request.user
         qs = Reserva.objects.select_related('experiencia', 'cliente', 'disponibilidad')
         if self.es_admin(user):
             return qs
-        if getattr(user, 'rol', None) == 'anfitrion':
+        if self.es_anfitrion(user):
             return qs.filter(Q(cliente=user) | Q(experiencia__anfitrion=user))
         return qs.filter(cliente=user)
 
@@ -255,9 +267,68 @@ class ReservaViewSet(viewsets.ModelViewSet):
 
     def perform_destroy(self, instance):
         user = self.request.user
-        if instance.cliente_id != user.id and not self.es_admin(user):
+        es_admin = self.es_admin(user)
+        if instance.cliente_id != user.id and not es_admin:
             raise PermissionDenied('Solo puedes cancelar tus propias reservas.')
         instance.delete()
+
+    CAMPOS_GESTION = {'estado', 'notas'}
+    ESTADOS_VALIDOS = ('pendiente', 'confirmada', 'completada', 'cancelada')
+    TRANSICIONES_ESTADO = {
+        'pendiente': {'confirmada', 'cancelada'},
+        'confirmada': {'completada', 'cancelada'},
+        'completada': set(),
+        'cancelada': set(),
+    }
+
+    def _resolver_permiso_update(self, reserva, user):
+        """Devuelve ('gestion'|'cliente') o lanza PermissionDenied."""
+        if self.es_admin(user):
+            return 'gestion'
+        if self.es_anfitrion(user) and reserva.experiencia.anfitrion_id == user.id:
+            return 'gestion'
+        if reserva.cliente_id == user.id:
+            return 'cliente'
+        raise PermissionDenied('No puedes modificar esta reserva.')
+
+    def update(self, request, *args, **kwargs):
+        reserva = self.get_object()
+        rol_update = self._resolver_permiso_update(reserva, request.user)
+
+        campos_permitidos = self.CAMPOS_GESTION if rol_update == 'gestion' else {'estado'}
+        if rol_update == 'cliente' and set(request.data.keys()) - campos_permitidos:
+            raise PermissionDenied('Como cliente solo puedes cancelar tu reserva.')
+        campos_desconocidos = set(request.data.keys()) - campos_permitidos
+        if campos_desconocidos:
+            raise ValidationError({
+                'detail': 'No puedes modificar esos campos de la reserva.',
+                'campos': sorted(campos_desconocidos),
+            })
+
+        data = {key: value for key, value in request.data.items() if key in campos_permitidos}
+        nuevo_estado = data.get('estado')
+
+        if rol_update == 'gestion':
+            if nuevo_estado and nuevo_estado not in self.ESTADOS_VALIDOS:
+                raise ValidationError({'estado': 'Estado no valido.'})
+        else:
+            if nuevo_estado != 'cancelada':
+                raise PermissionDenied('Como cliente solo puedes cancelar tu reserva.')
+
+        if nuevo_estado and nuevo_estado != reserva.estado:
+            transiciones = self.TRANSICIONES_ESTADO.get(reserva.estado, set())
+            if nuevo_estado not in transiciones:
+                raise ValidationError({
+                    'estado': f'No se puede cambiar de {reserva.estado} a {nuevo_estado}.',
+                })
+
+        serializer = self.get_serializer(reserva, data=data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
+
+    def partial_update(self, request, *args, **kwargs):
+        return self.update(request, *args, **kwargs)
 
     @swagger_auto_schema(
         operation_summary='Listar reservas',

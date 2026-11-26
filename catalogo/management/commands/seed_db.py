@@ -122,6 +122,14 @@ def generar_experiencias_colombia(cantidad):
                 f"{destino['descripcion']} Modalidad de demostración: {variante.lower()}. "
                 'Confirma con el anfitrión la disponibilidad, condiciones locales, permisos y servicios incluidos.'
             ),
+            'incluye': (
+                'Acompañamiento de un anfitrión local durante el recorrido.\n'
+                'Paradas de interpretación del entorno y tiempo para fotografías.'
+            ),
+            'recomendaciones': (
+                'Usa calzado cómodo, lleva agua y protección solar. '
+                'Confirma con el anfitrión el transporte, alimentación, permisos y condiciones del clima.'
+            ),
             'precio': f"{random.SystemRandom().randrange(80000, 1200001, 1000)}.00",
         })
     return experiencias
@@ -156,20 +164,7 @@ class Command(BaseCommand):
 
         categorias = self.crear_categorias(options['categorias'])
         usuarios = self.crear_usuarios(options['usuarios'])
-        host = Usuario.objects.filter(roles__nombre='Anfitrión').order_by('id').first()
-        if not host:
-            host, _ = Usuario.objects.get_or_create(
-                username='anfitrion_test',
-                defaults={
-                    'email': 'anfitrion@test.com', 'first_name': 'Anfitrión',
-                    'last_name': 'EcoRutas', 'documento_identidad': '12345678A',
-                    'estado_verificacion': 'aprobado',
-                },
-            )
-            if not host.password or not host.has_usable_password():
-                host.set_password('testpass123')
-                host.save(update_fields=['password'])
-            host.roles.add(Rol.objects.get(nombre='Anfitrión'))
+        host = self.obtener_anfitrion_demo()
 
         catalogo = generar_experiencias_colombia(options['experiencias'])
         if options['reemplazar_experiencias']:
@@ -189,6 +184,22 @@ class Command(BaseCommand):
             f'Catálogo colombiano listo: {len(experiencias)} experiencias, '
             f'{len(categorias)} categorías disponibles, {len(usuarios)} usuarios de prueba.'
         ))
+
+    def obtener_anfitrion_demo(self):
+        """Asegura la cuenta Anfitrion de demostracion que posee el catalogo sembrado."""
+        rol_anfitrion = Rol.objects.get(nombre='Anfitrión')
+        host, _ = Usuario.objects.get_or_create(
+            username='anfitrion_demo',
+            defaults={
+                'email': 'anfitrion.demo@ecorutas.com',
+                'first_name': 'Anfitrion',
+                'last_name': 'Demo',
+                'documento_identidad': 'DEMO-0001',
+                'estado_verificacion': 'aprobado',
+            },
+        )
+        host.roles.add(rol_anfitrion)
+        return host
 
     def crear_rbac(self):
         roles = {name: Rol.objects.get_or_create(nombre=name)[0] for name in ('Administrador', 'Anfitrión', 'Turista')}
@@ -255,6 +266,7 @@ class Command(BaseCommand):
                     'anfitrion': anfitrion, 'categoria': categoria,
                     'descripcion': item['descripcion'], 'precio_unitario': Decimal(item['precio']),
                     'latitud': Decimal(item['latitud']), 'longitud': Decimal(item['longitud']), 'estado': 'Activa',
+                    'incluye': item['incluye'], 'recomendaciones': item['recomendaciones'],
                 },
             )
             experiencias.append(experiencia)
